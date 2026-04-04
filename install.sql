@@ -1,0 +1,26 @@
+CREATE TABLE IF NOT EXISTS `jgr_reports` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `citizenid` varchar(50) NOT NULL,
+  `playerName` varchar(100) NOT NULL,
+  `serverId` int(11) DEFAULT NULL,
+  `title` varchar(150) NOT NULL,
+  `description` text NOT NULL,
+  `priority` varchar(20) NOT NULL DEFAULT 'Baja',
+  `status` varchar(20) NOT NULL DEFAULT 'Abierto',
+  `adminCitizenid` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `jgr_report_messages` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `report_id` int(11) NOT NULL,
+  `sender` varchar(50) NOT NULL,
+  `message` text NOT NULL,
+  `is_admin` boolean NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `fk_report_id` (`report_id`),
+  CONSTRAINT `fk_report_id` FOREIGN KEY (`report_id`) REFERENCES `jgr_reports` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

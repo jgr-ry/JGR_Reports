@@ -1,0 +1,968 @@
+:root {
+    --bg-main: rgba(20, 20, 22, 0.75);
+    /* iOS Dark Translucent */
+    --bg-secondary: rgba(44, 44, 46, 0.85);
+    /* Slightly lighter */
+    --border-color: rgba(255, 255, 255, 0.1);
+    --primary: #0a84ff;
+    /* iOS Blue */
+    --primary-hover: #006ee6;
+    --success: #30d158;
+    /* iOS Green darker */
+    --danger: #ff453a;
+    /* iOS Red */
+    --warning: #ff9f0a;
+    /* iOS Orange */
+    --text-main: #ffffff;
+    --text-muted: #ebebf599;
+    /* iOS secondary text */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius-lg: 24px;
+    --radius-md: 14px;
+    --radius-sm: 8px;
+
+    --blur: blur(35px);
+}
+
+/* FIX PARA LA SOMBRA NEGRA Y BORDES (FORZAMOS TRANSPARENCIA ABSOLUTA EN TODO) */
+html,
+body {
+    background: transparent !important;
+    background-color: transparent !important;
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    font-family: var(--font-family);
+    color: var(--text-main);
+    user-select: none;
+}
+
+#app {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: transparent !important;
+    background-color: transparent !important;
+    /* IMPORTANTE */
+    perspective: 1000px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Vistas con animaciones 3D sutiles y Glassmorphism */
+.view {
+    width: 440px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    animation: scaleInBounce 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards;
+    position: relative;
+    /* FIX DEFINITIVO PARA CEF/FIVEM: Mascara vectorial sobre borde para cortar el desenfoque */
+    background: var(--bg-main);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+    overflow: hidden;
+    -webkit-mask-image: -webkit-radial-gradient(white, rgba(0, 0, 0, 0));
+    mask-image: radial-gradient(white, rgba(0, 0, 0, 0));
+    transform: translateZ(0);
+    z-index: 1;
+}
+
+/* Stroke retina */
+
+#admin-panel-view {
+    width: 700px;
+    height: 650px;
+}
+
+#chat-view {
+    width: 420px;
+    height: 680px;
+}
+
+/* Headers */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: transparent;
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.header h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-main);
+    letter-spacing: -0.5px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #0a84ff 0%, #005bb5 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-info-header {
+    display: flex;
+    flex-direction: column;
+    margin-left: 5px;
+}
+
+.chat-info-header h2 {
+    font-size: 1.1rem;
+}
+
+.status-dot {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 2px;
+}
+
+.status-dot::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #888;
+}
+
+.status-dot.Abierto::before {
+    background: var(--success);
+}
+
+.status-dot.En.progreso::before {
+    background: var(--warning);
+}
+
+.status-dot.Cerrado::before {
+    background: var(--danger);
+}
+
+.close-btn,
+.icon-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.close-btn:hover,
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    transform: scale(1.05);
+}
+
+.close-btn:active,
+.icon-btn:active {
+    transform: scale(0.95);
+}
+
+.back-btn {
+    background: transparent;
+    color: var(--primary);
+    font-size: 1.3rem;
+    margin-left: -10px;
+}
+
+.back-btn:hover {
+    background: transparent;
+    color: var(--primary-hover);
+    transform: translateX(-3px);
+}
+
+
+/* Menú Opciones Chat (Dropdown iOS) */
+.ios-dropdown {
+    position: absolute;
+    top: 60px;
+    right: 20px;
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+    transform-origin: top right;
+    animation: menuPopIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.2) forwards;
+    /* Fondo restaurado y fix de CEF mascara radial */
+    background: rgba(44, 44, 46, 0.95);
+    -webkit-backdrop-filter: blur(50px);
+    backdrop-filter: blur(50px);
+    overflow: hidden;
+    -webkit-mask-image: -webkit-radial-gradient(white, rgba(0, 0, 0, 0));
+    mask-image: radial-gradient(white, rgba(0, 0, 0, 0));
+    transform: translateZ(0);
+}
+
+.ios-dropdown.hidden {
+    display: none !important;
+}
+
+.dropdown-item {
+    background: transparent;
+    border: none;
+    padding: 14px 18px;
+    color: white;
+    font-size: 0.95rem;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+    transition: background 0.2s;
+}
+
+.dropdown-item:first-child {
+    border-top-left-radius: var(--radius-md);
+    border-top-right-radius: var(--radius-md);
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+    border-bottom-left-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
+}
+
+.dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-item.danger {
+    color: var(--danger);
+}
+
+
+/* Contenido general */
+.content {
+    padding: 24px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* Formularios iOS Animados */
+.input-group {
+    margin-bottom: 20px;
+    animation: slideUpFade 0.4s ease forwards;
+    opacity: 0;
+}
+
+.input-group:nth-child(1) {
+    animation-delay: 0.1s;
+}
+
+.input-group:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.input-group:nth-child(3) {
+    animation-delay: 0.2s;
+}
+
+.input-group label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+.input-group input,
+.input-group textarea {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    color: white;
+    font-family: var(--font-family);
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.input-group input:focus,
+.input-group textarea:focus {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary);
+}
+
+/* Botones Prioridad iOS Segmentados */
+.priority-buttons {
+    display: flex;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: var(--radius-md);
+    padding: 4px;
+    gap: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.btn-priority {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-priority.active.baja {
+    background: rgba(48, 209, 88, 0.2);
+    color: #30d158;
+}
+
+.btn-priority.active.media {
+    background: rgba(255, 159, 10, 0.2);
+    color: #ff9f0a;
+}
+
+.btn-priority.active.alta {
+    background: rgba(255, 69, 58, 0.2);
+    color: #ff453a;
+}
+
+/* Botones principales */
+.form-actions {
+    margin-top: 25px;
+    animation: slideUpFade 0.4s ease forwards;
+    animation-delay: 0.25s;
+    opacity: 0;
+}
+
+.btn-primary {
+    width: 100%;
+    background: linear-gradient(135deg, var(--primary) 0%, #005bb5 100%);
+    color: white;
+    border: none;
+    padding: 16px;
+    border-radius: var(--radius-md);
+    font-size: 1.05rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+}
+
+.btn-primary:active {
+    transform: translateY(1px) scale(0.98);
+}
+
+/* BUSCADOR ADMIN (Search Bar iOS) */
+.admin-toolbar {
+    padding: 12px 20px 0 20px;
+    background: transparent;
+}
+
+.ios-search-bar {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 8px 12px;
+    gap: 8px;
+}
+
+.ios-search-bar i {
+    color: #8e8e93;
+    font-size: 0.95rem;
+}
+
+.ios-search-bar input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 0.95rem;
+    outline: none;
+    font-family: var(--font-family);
+}
+
+.ios-search-bar input::placeholder {
+    color: #8e8e93;
+}
+
+/* Control Segmentado (Tabs) */
+.ios-segmented-control {
+    display: flex;
+    margin: 15px 20px 5px 20px;
+    background: rgba(118, 118, 128, 0.24);
+    border-radius: 9px;
+    padding: 3px;
+    position: relative;
+}
+
+.segment-btn {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    border-radius: 7px;
+    transition: all 0.3s ease;
+}
+
+.segment-btn.active {
+    color: white;
+    background: rgba(99, 99, 102, 0.8);
+}
+
+/* Cards tipo listado iOS Settings */
+.admin-content {
+    background: transparent;
+    padding: 15px 20px;
+}
+
+.report-card {
+    background: rgba(255, 255, 255, 0.05);
+    /* Efecto cristalino de tarjeta */
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+    animation: slideUpFade 0.3s ease forwards;
+    opacity: 0;
+}
+
+/* Stagger animation for cards */
+.report-card:nth-child(1) {
+    animation-delay: 0.05s;
+}
+
+.report-card:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.report-card:nth-child(3) {
+    animation-delay: 0.15s;
+}
+
+.report-card:nth-child(4) {
+    animation-delay: 0.2s;
+}
+
+.report-card:nth-child(5) {
+    animation-delay: 0.25s;
+}
+
+.report-card:nth-child(n+6) {
+    opacity: 1;
+    animation: none;
+}
+
+.report-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateX(4px);
+}
+
+.report-info h4 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+}
+
+.report-info p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.report-card .btn-take {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--primary);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.report-card .btn-take:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.05);
+}
+
+.report-card .btn-take:active {
+    transform: scale(0.95);
+}
+
+/* Mensajes Chat iMessage Style Animados */
+.messages-container {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.msg {
+    max-width: 78%;
+    padding: 12px 16px;
+    border-radius: 22px;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    position: relative;
+    animation: messagePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.2) forwards;
+    opacity: 0;
+    transform-origin: bottom;
+}
+
+.msg-admin {
+    background: rgba(50, 50, 52, 0.95);
+    color: white;
+    align-self: flex-start;
+    border-bottom-left-radius: 6px;
+    transform-origin: left bottom;
+}
+
+.msg-player {
+    background: linear-gradient(135deg, var(--primary) 0%, #005bb5 100%);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 6px;
+    transform-origin: right bottom;
+}
+
+.msg-sender {
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-bottom: 4px;
+    display: block;
+    color: #aaa;
+}
+
+.msg-player .msg-sender {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.msg-time {
+    font-size: 0.7rem;
+    position: absolute;
+    bottom: -18px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.msg-player .msg-time {
+    right: 8px;
+}
+
+.msg-admin .msg-time {
+    left: 8px;
+}
+
+.chat-input-area {
+    padding: 12px 18px 20px 18px;
+    background: rgba(25, 25, 27, 0.85);
+    border-top: 0.5px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom-left-radius: var(--radius-lg);
+    border-bottom-right-radius: var(--radius-lg);
+    overflow: hidden;
+    -webkit-mask-image: -webkit-radial-gradient(white, rgba(0, 0, 0, 0));
+    mask-image: radial-gradient(white, rgba(0, 0, 0, 0));
+    transform: translateZ(0);
+}
+
+.input-wrapper {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 6px;
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.input-wrapper:focus-within {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+#chat-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 8px 14px;
+    color: white;
+    outline: none;
+    font-size: 0.95rem;
+    font-family: var(--font-family);
+}
+
+.btn-icon.send {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-right: 2px;
+    transition: 0.2s;
+}
+
+.btn-icon.send:hover {
+    background: var(--primary-hover);
+    transform: scale(1.05);
+}
+
+.btn-icon.send:active {
+    transform: scale(0.9);
+}
+
+
+/* PANTALLA DE LLAMADAS (Diseño Teléfono Vertical Esquina) */
+.modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    pointer-events: none;
+    /* Dejamos que el usuario clickee debajo si quiere en la zona vacía por precaución */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Quitamos el blur de pantalla completa para que solo sea en el teléfono */
+.blur-bg {
+    display: none;
+}
+
+.ios-call-screen {
+    position: absolute;
+    bottom: 25px;
+    right: 30px;
+    pointer-events: auto;
+    /* Reactivamos clicks en el modal en sí */
+    text-align: center;
+    width: 300px;
+    height: 560px;
+    /* Tamaño tipo iPhone vertical compacto */
+    border-radius: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 15px;
+    animation: phoneSlideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    /* Fondo restaurado y CEF fix */
+    background: var(--bg-main);
+    -webkit-backdrop-filter: blur(25px);
+    backdrop-filter: blur(25px);
+    overflow: hidden;
+    -webkit-mask-image: -webkit-radial-gradient(white, rgba(0, 0, 0, 0));
+    mask-image: radial-gradient(white, rgba(0, 0, 0, 0));
+    transform: translateZ(0);
+}
+
+/* Isla Dinámica / Notch Visual */
+.ios-call-screen::after {
+    content: '';
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 30px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 10;
+}
+
+.call-header-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+.call-subtitle {
+    font-size: 1.1rem;
+    color: #ccc;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.call-title {
+    font-size: 2.2rem;
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+.call-actions-row {
+    display: flex;
+    justify-content: space-between;
+    width: 85%;
+    margin-bottom: 50px;
+    /* Margen inferior para los botones de colgar/aceptar */
+}
+
+.center-action {
+    justify-content: center;
+    width: 100%;
+}
+
+.action-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.action-wrap span {
+    font-size: 0.9rem;
+    color: #fff;
+    font-weight: 500;
+}
+
+.call-btn-circular {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    border: none;
+    font-size: 28px;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.call-btn-circular.success {
+    background: var(--success);
+}
+
+.call-btn-circular.danger {
+    background: var(--danger);
+}
+
+.call-btn-circular.success:hover {
+    background: #28b84d;
+    transform: translateY(-3px);
+}
+
+.call-btn-circular.danger:hover {
+    background: #e0382d;
+    transform: translateY(-3px);
+}
+
+.call-btn-circular:active {
+    opacity: 0.8;
+    transform: scale(0.9);
+}
+
+/* Pulso para llamada entrante, quitando el shadow lo cambiamos por un glow usando border/opacity si quieres,
+   pero el usuario pidió 0 sombras, así que quitamos este keyframe o lo reemplazamos por opacidad */
+.call-btn-circular.success {
+    animation: callPulseNoShadow 1.5s infinite alternate ease-in-out;
+}
+
+
+/* Animations Generales */
+@keyframes phoneSlideUp {
+    0% {
+        transform: translateY(120%) scale(0.9);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes scaleInBounce {
+    0% {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes menuPopIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.95) translateY(-5px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes slideUpFade {
+    0% {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes messagePop {
+    0% {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes callPulseNoShadow {
+    0% {
+        transform: scale(1);
+    }
+
+    100% {
+        transform: scale(1.05);
+    }
+}
+
+::-webkit-scrollbar {
+    width: 5px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* === GLOBAL: Eliminar todas las sombras/filtros en la UI === */
+/* Esto fuerza que no haya sombras ni text-shadows ni filtros que generen sombras */
+*,
+*::before,
+*::after {
+    box-shadow: none !important;
+    -webkit-box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    -webkit-filter: none !important;
+}
+
+/* OVERRIDE GLOBAL: Desactivar máscaras y blurs que causan artefactos en CEF/CEF-embedded */
+*,
+*::before,
+*::after {
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Forzar fondos no totalmente-transparentes en capas principales para evitar mostrar el fondo negro del motor */
+.view,
+.ios-dropdown,
+.chat-input-area,
+.ios-call-screen,
+.admin-content {
+    background: rgba(28, 28, 30, 0.92) !important;
+    background-color: rgba(28, 28, 30, 0.92) !important;
+}
+
+/* Asegurar que las tarjetas y wrappers no recorten con máscaras */
+.report-card,
+.input-wrapper,
+.input-group,
+.messages-container {
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+}
