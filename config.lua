@@ -12,6 +12,7 @@ Config.VoiceChannelBase = 8000
 
 -- Permisos de admin
 Config.AdminGroups = {
+    'mod',
     'admin',
     'god'
 }

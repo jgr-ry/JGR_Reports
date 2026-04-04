@@ -39,7 +39,10 @@ end)
 -- ==========================================
 RegisterNetEvent('jgr_reports:client:openCreateForm', function()
     OpenNUI()
-    SendNUIMessage({ action = "open_create" })
+    -- Cargar lista de staff activo para mostrarlo al jugador
+    QBCore.Functions.TriggerCallback('jgr_reports:server:getActiveStaff', function(staffList)
+        SendNUIMessage({ action = "open_create", staffList = staffList })
+    end)
 end)
 
 RegisterNetEvent('jgr_reports:client:openActiveReport', function(reportData)

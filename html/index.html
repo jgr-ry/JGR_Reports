@@ -24,6 +24,15 @@
                 <button class="close-btn ui-sound" data-sound="hover"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="content">
+                <!-- Staff activo -->
+                <div id="staff-online-section" class="staff-online-section">
+                    <div class="staff-online-header">
+                        <span class="staff-online-dot"></span>
+                        <span id="staff-online-label">Cargando staff...</span>
+                    </div>
+                    <div id="staff-online-list" class="staff-online-list"></div>
+                </div>
+
                 <form id="create-report-form">
                     <div class="input-group">
                         <label>Título del incidente</label>
@@ -98,6 +107,8 @@
                         <span id="chat-status" class="status-dot online">En progreso</span>
                     </div>
                 </div>
+                <!-- Info jugador/staff (solo visible para admin) -->
+                <div id="chat-report-info" class="chat-report-info" style="display:none;"></div>
                 <!-- Menú contextual estilo iOS -->
                 <button id="chat-options-btn" class="icon-btn ui-sound" data-sound="hover"><i
                         class="fa-solid fa-ellipsis"></i></button>

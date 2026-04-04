@@ -1,6 +1,23 @@
 local QBCore = exports[Config.CoreName]:GetCoreObject()
 
 -- ==========================================
+-- HELPER: Obtener nombre de Steam de un jugador
+-- ==========================================
+local function GetSteamName(src)
+    local numIdents = GetNumPlayerIdentifiers(src)
+    for i = 0, numIdents - 1 do
+        local ident = GetPlayerIdentifier(src, i)
+        if ident and ident:find("steam:") then
+            -- Intentar obtener el nombre de Steam via nombre del jugador
+            -- El nombre real del jugador en FiveM suele ser el de Steam
+            break
+        end
+    end
+    -- Retornamos el nombre del jugador en el servidor (suele ser el nombre de Steam)
+    return GetPlayerName(src) or "Desconocido"
+end
+
+-- ==========================================
 -- AUTO IMPORT SQL
 -- ==========================================
 CreateThread(function()
@@ -25,6 +42,21 @@ CreateThread(function()
                 print('^1[JGR_Reports] ^0Error: install.sql not found!^0')
             end
         else
+            -- Intentar añadir columnas nuevas si la tabla ya existe (actualización)
+            MySQL.query("SHOW COLUMNS FROM jgr_reports LIKE 'steamName'", {}, function(cols)
+                if #cols == 0 then
+                    MySQL.query("ALTER TABLE jgr_reports ADD COLUMN `steamName` varchar(100) DEFAULT NULL AFTER `playerName`")
+                    MySQL.query("ALTER TABLE jgr_reports ADD COLUMN `adminName` varchar(100) DEFAULT NULL AFTER `adminCitizenid`")
+                    print('^2[JGR_Reports] ^0Columnas steamName y adminName añadidas.^0')
+                end
+            end)
+            MySQL.query("SHOW COLUMNS FROM jgr_report_messages LIKE 'sender_id'", {}, function(cols)
+                if #cols == 0 then
+                    MySQL.query("ALTER TABLE jgr_report_messages ADD COLUMN `sender_id` int(11) DEFAULT NULL AFTER `sender`")
+                    MySQL.query("ALTER TABLE jgr_report_messages MODIFY COLUMN `sender` varchar(100) NOT NULL")
+                    print('^2[JGR_Reports] ^0Columna sender_id añadida a jgr_report_messages.^0')
+                end
+            end)
             print('^2[JGR_Reports] ^0Database tables already exist. Skipping import.^0')
         end
     end)
@@ -68,10 +100,12 @@ QBCore.Functions.CreateCallback('jgr_reports:server:createReport', function(sour
     local title = data.title
     local description = data.description
     local priority = data.priority
+    local steamName = GetSteamName(src)
     
-    MySQL.insert("INSERT INTO jgr_reports (citizenid, playerName, serverId, title, description, priority) VALUES (?, ?, ?, ?, ?, ?)", {
+    MySQL.insert("INSERT INTO jgr_reports (citizenid, playerName, steamName, serverId, title, description, priority) VALUES (?, ?, ?, ?, ?, ?, ?)", {
         Player.PlayerData.citizenid, 
         Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname,
+        steamName,
         src,
         title,
         description,
@@ -82,7 +116,7 @@ QBCore.Functions.CreateCallback('jgr_reports:server:createReport', function(sour
             local players = QBCore.Functions.GetPlayers()
             for _, v in pairs(players) do
                 if QBCore.Functions.HasPermission(v, Config.AdminGroups) then
-                    TriggerClientEvent('QBCore:Notify', v, 'Nuevo reporte recibido de '..Player.PlayerData.charinfo.firstname, 'primary', 5000)
+                    TriggerClientEvent('QBCore:Notify', v, 'Nuevo reporte recibido de '..Player.PlayerData.charinfo.firstname..' [ID:'..src..']', 'primary', 5000)
                 end
             end
             cb(id)
@@ -116,18 +150,39 @@ QBCore.Functions.CreateCallback('jgr_reports:server:getMessages', function(sourc
     end)
 end)
 
+-- Callback para obtener lista de staff activo (para la UI del jugador)
+QBCore.Functions.CreateCallback('jgr_reports:server:getActiveStaff', function(source, cb)
+    local staffList = {}
+    local players = QBCore.Functions.GetPlayers()
+    for _, v in pairs(players) do
+        if QBCore.Functions.HasPermission(v, Config.AdminGroups) then
+            local staffPlayer = QBCore.Functions.GetPlayer(v)
+            if staffPlayer then
+                table.insert(staffList, {
+                    serverId = v,
+                    name = staffPlayer.PlayerData.charinfo.firstname .. " " .. staffPlayer.PlayerData.charinfo.lastname,
+                    steamName = GetSteamName(v)
+                })
+            end
+        end
+    end
+    cb(staffList)
+end)
+
 RegisterNetEvent('jgr_reports:server:takeReport', function(reportId)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player or not QBCore.Functions.HasPermission(src, Config.AdminGroups) then return end
     
-    MySQL.update("UPDATE jgr_reports SET status = 'En progreso', adminCitizenid = ? WHERE id = ?", {Player.PlayerData.citizenid, reportId}, function(affectedRows)
+    local adminName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
+    
+    MySQL.update("UPDATE jgr_reports SET status = 'En progreso', adminCitizenid = ?, adminName = ? WHERE id = ?", {Player.PlayerData.citizenid, adminName, reportId}, function(affectedRows)
         if affectedRows > 0 then
             -- Buscar jugador original y notificarle
             MySQL.query("SELECT serverId FROM jgr_reports WHERE id = ?", {reportId}, function(res)
                 if res[1] and res[1].serverId then
                     local targetId = res[1].serverId
-                    TriggerClientEvent('QBCore:Notify', targetId, 'Un administrador está atendiendo tu reporte', 'success')
+                    TriggerClientEvent('QBCore:Notify', targetId, 'El staff ' .. adminName .. ' está atendiendo tu reporte', 'success')
                     TriggerClientEvent('jgr_reports:client:updateReportData', targetId)
                 end
             end)
@@ -140,11 +195,18 @@ RegisterNetEvent('jgr_reports:server:sendMessage', function(reportId, message, i
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
     
-    local senderName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
-    if isAdmin then senderName = "Admin " .. senderName end
+    local charName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
+    local steamName = GetSteamName(src)
+    -- El sender guardado incluye nombre de personaje + steam name + ID
+    local senderDisplay
+    if isAdmin then
+        senderDisplay = "[Staff] " .. charName .. " (" .. steamName .. ") [ID:" .. src .. "]"
+    else
+        senderDisplay = charName .. " (" .. steamName .. ") [ID:" .. src .. "]"
+    end
     
-    MySQL.insert("INSERT INTO jgr_report_messages (report_id, sender, message, is_admin) VALUES (?, ?, ?, ?)", {
-        reportId, senderName, message, isAdmin and 1 or 0
+    MySQL.insert("INSERT INTO jgr_report_messages (report_id, sender, sender_id, message, is_admin) VALUES (?, ?, ?, ?, ?)", {
+        reportId, senderDisplay, src, message, isAdmin and 1 or 0
     }, function(msgId)
         if msgId then
             -- Tenemos que enviarle el nuevo mensaje al otro extremo.
@@ -155,19 +217,27 @@ RegisterNetEvent('jgr_reports:server:sendMessage', function(reportId, message, i
                     
                     -- Si es el admin quien envía, notificar al jugador
                     if isAdmin and targetSrc then
-                        TriggerClientEvent('jgr_reports:client:receiveMessage', targetSrc, msgId, senderName, message, isAdmin)
+                        TriggerClientEvent('jgr_reports:client:receiveMessage', targetSrc, msgId, senderDisplay, message, isAdmin)
                     end
                     
                     -- Si es el jugador quien envía, notificar al admin
                     if not isAdmin and res[1].adminCitizenid then
                         local adminPlayer = QBCore.Functions.GetPlayerByCitizenId(res[1].adminCitizenid)
                         if adminPlayer then
-                            TriggerClientEvent('jgr_reports:client:receiveMessage', adminPlayer.PlayerData.source, msgId, senderName, message, isAdmin)
+                            TriggerClientEvent('jgr_reports:client:receiveMessage', adminPlayer.PlayerData.source, msgId, senderDisplay, message, isAdmin)
                         end
                     end
                     
-                    -- Enviarselo al que lo escribió para que también lo vea reflejado si estaba enviando
-                    TriggerClientEvent('jgr_reports:client:receiveMessage', src, msgId, senderName, message, isAdmin)
+                    -- Notificar también a los demás admins que estén viendo el reporte
+                    local players = QBCore.Functions.GetPlayers()
+                    for _, v in pairs(players) do
+                        if v ~= src and QBCore.Functions.HasPermission(v, Config.AdminGroups) then
+                            TriggerClientEvent('jgr_reports:client:receiveMessage', v, msgId, senderDisplay, message, isAdmin)
+                        end
+                    end
+                    
+                    -- Enviarselo al que lo escribió para que también lo vea reflejado
+                    TriggerClientEvent('jgr_reports:client:receiveMessage', src, msgId, senderDisplay, message, isAdmin)
                 end
             end)
         end
@@ -232,8 +302,6 @@ RegisterNetEvent('jgr_reports:server:answerCall', function(adminSrc, reportId)
     
     -- Generar un canal aleatorio alto para no pisar canales de policía u otros reportes
     local channel = math.random(8000, 9999)
-    -- Opcional: Podrías comprobar si ese channel ya existe en activeCallChannels, 
-    -- pero con 2000 posibilidades la colisión es casi imposible en uso simultáneo.
     activeCallChannels[reportId] = channel
     
     -- Notificar al admin que contestó

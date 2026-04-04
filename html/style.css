@@ -925,6 +925,164 @@ body {
     background: rgba(255, 255, 255, 0.4);
 }
 
+/* ==========================================
+   STAFF ONLINE SECTION (Vista crear reporte)
+   ========================================== */
+.staff-online-section {
+    background: rgba(255, 255, 255, 0.04);
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    animation: slideUpFade 0.4s ease forwards;
+    opacity: 0;
+}
+
+.staff-online-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.staff-online-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff6b6b;
+    transition: background 0.4s ease;
+    flex-shrink: 0;
+}
+
+.staff-online-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.staff-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: rgba(10, 132, 255, 0.08);
+    border: 0.5px solid rgba(10, 132, 255, 0.2);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: white;
+}
+
+.staff-badge i {
+    color: var(--primary);
+    font-size: 0.8rem;
+}
+
+.staff-badge-name {
+    font-weight: 600;
+    flex: 1;
+}
+
+.staff-badge-steam {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* ==========================================
+   SENDER INFO EN MENSAJES (Steam + ID)
+   ========================================== */
+.msg-sender-steam {
+    opacity: 0.65;
+    font-weight: 400;
+    font-size: 0.72rem;
+}
+
+.msg-sender-id {
+    background: rgba(255, 255, 255, 0.12);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 2px;
+}
+
+.staff-sender {
+    color: #64d2ff !important;
+}
+
+.self-sender {
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.6) !important;
+    display: block;
+    margin-bottom: 4px;
+}
+
+/* ==========================================
+   CHAT REPORT INFO (Header del chat - admin)
+   ========================================== */
+.chat-report-info {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    margin: 0 auto;
+    line-height: 1.6;
+    max-width: 90%;
+    text-align: center;
+}
+
+.chat-steam {
+    opacity: 0.7;
+    font-size: 0.74rem;
+}
+
+.chat-serverid {
+    background: rgba(255, 255, 255, 0.12);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.72rem;
+}
+
+/* ==========================================
+   CARD INFO EXTRA (Steam/ID/Staff en panel admin)
+   ========================================== */
+.card-player-line,
+.card-status-line {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin: 2px 0;
+}
+
+.card-steam {
+    opacity: 0.7;
+    font-size: 0.78rem;
+}
+
+.card-serverid {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    margin-left: 2px;
+}
+
+.card-staff-attending {
+    color: #64d2ff;
+    font-weight: 600;
+}
+
+.card-staff-name {
+    color: #64d2ff;
+    font-weight: 600;
+}
+
 /* === GLOBAL: Eliminar todas las sombras/filtros en la UI === */
 /* Esto fuerza que no haya sombras ni text-shadows ni filtros que generen sombras */
 *,
