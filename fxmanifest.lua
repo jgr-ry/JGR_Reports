@@ -28,3 +28,7 @@ files {
     'html/images/*.png',
     'install.sql'
 }
+
+escrow_ignore {
+    'config.lua'
+}
