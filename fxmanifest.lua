@@ -1,7 +1,7 @@
 fx_version 'cerulean'
 game 'gta5'
 
-author 'JGR Reports'
+author 'JGR Studio'
 description 'Sistema Avanzado de Reportes'
 version '1.0.0'
 
