@@ -1,18 +1,44 @@
 Config = {}
 
--- Configuración general
-Config.CoreName = 'qb-core'
+-- Idioma: 'es' | 'en'
+Config.Locale = 'es'
+
+--[[
+    ---------------------------------------------------------------------------
+    FRAMEWORK 
+    ---------------------------------------------------------------------------
+    Pon UNA de estas cadenas (minúsculas recomendado):
+
+    'qb'         → qb-core  (QBCore clásico, permisos con Config.AdminGroups)
+    'qbox'       → qbx_core (Qbox; misma API que QB)
+    'qbx'        → alias de 'qbox'
+
+    'esx'        → es_extended (staff = grupo getGroup() o job en Config.AdminGroups)
+
+    'standalone' → sin qb/esx (identidad por license; staff = ACE y/o lista abajo)
+    ---------------------------------------------------------------------------
+]]
+Config.Framework = 'qb'
+
+-- Comandos
 Config.CommandPlayer = 'report'
 Config.CommandAdmin = 'reportes'
 
--- Sistema de Voz (pma-voice)
--- Si llamas a un jugador, se les asigna un canal de radio temporal.
--- Empezará desde este canal y sumará el ID del reporte (ej: Reporte 5 = Canal 8000 + 5)
+-- Llamadas de voz (pma-voice; si no existe, se ignora)
 Config.VoiceChannelBase = 8000
 
--- Permisos de admin
+-- Staff: en qb/qbox = permisos ACE de QBCore | en esx = nombre de grupo o de job
 Config.AdminGroups = {
     'mod',
     'admin',
-    'god'
+    'god',
 }
+
+-- Solo si Config.Framework = 'standalone'
+Config.StandaloneAce = 'jgr_reports.admin'
+Config.StandaloneAdminLicenses = {
+    -- 'license:xxxxxxxx',
+}
+
+Config.AutoCloseOfflineMinutes = 10
+Config.StatusCheckIntervalMs = 60000

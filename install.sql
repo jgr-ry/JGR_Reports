@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS `jgr_reports` (
   `status` varchar(20) NOT NULL DEFAULT 'Abierto',
   `adminCitizenid` varchar(50) DEFAULT NULL,
   `adminName` varchar(100) DEFAULT NULL,
+  `close_reason` varchar(32) DEFAULT NULL,
+  `closed_by_citizenid` varchar(50) DEFAULT NULL,
+  `closed_by_name` varchar(100) DEFAULT NULL,
+  `player_offline_since` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`)

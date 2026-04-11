@@ -1,20 +1,84 @@
-local QBCore = exports[Config.CoreName]:GetCoreObject()
+local CLOSE_REASON = {
+    STAFF = 'staff',
+    PLAYER = 'player',
+    INACTIVITY = 'inactivity',
+}
 
--- ==========================================
--- HELPER: Obtener nombre de Steam de un jugador
--- ==========================================
 local function GetSteamName(src)
-    local numIdents = GetNumPlayerIdentifiers(src)
-    for i = 0, numIdents - 1 do
-        local ident = GetPlayerIdentifier(src, i)
-        if ident and ident:find("steam:") then
-            -- Intentar obtener el nombre de Steam via nombre del jugador
-            -- El nombre real del jugador en FiveM suele ser el de Steam
-            break
+    return GetPlayerName(src) or JGRReportsT('ui_unknown')
+end
+
+local function GetCharacterFullName(P)
+    if not P then return JGRReportsT('ui_unknown') end
+    local n = P:getCharName()
+    if not n or n == '' then return JGRReportsT('ui_unknown') end
+    return n
+end
+
+local function NotifyAdminsReportStale()
+    for _, v in ipairs(JGR_Fw.GetAllPlayerSources()) do
+        if JGR_Fw.IsStaff(v) then
+            TriggerClientEvent('jgr_reports:client:reportListStale', v)
         end
     end
-    -- Retornamos el nombre del jugador en el servidor (suele ser el nombre de Steam)
-    return GetPlayerName(src) or "Desconocido"
+end
+
+--- Cierra un reporte activo y notifica a quien corresponda.
+---@param reportId number
+---@param reason string CLOSE_REASON.*
+---@param closedByCitizenid string|nil
+---@param closedByName string|nil
+---@param staffCloserSrc number|nil si un staff cierra manualmente, recibe confirmación aquí
+local function CloseReportInternal(reportId, reason, closedByCitizenid, closedByName, staffCloserSrc)
+    MySQL.update(
+        [[UPDATE jgr_reports SET status = 'Cerrado', close_reason = ?, closed_by_citizenid = ?, closed_by_name = ?,
+            player_offline_since = NULL WHERE id = ? AND status IN ('Abierto', 'En progreso')]],
+        { reason, closedByCitizenid, closedByName, reportId },
+        function(affectedRows)
+            if not affectedRows or affectedRows < 1 then return end
+
+            MySQL.query('SELECT citizenid, adminCitizenid FROM jgr_reports WHERE id = ?', { reportId }, function(res)
+                if not res[1] then return end
+                local citizenid = res[1].citizenid
+                local adminCid = res[1].adminCitizenid
+
+                local targetPlayer = JGR_Fw.GetPlayerByIdentifier(citizenid)
+                if targetPlayer then
+                    local msg
+                    if reason == CLOSE_REASON.INACTIVITY then
+                        msg = JGRReportsT('notify_report_closed_inactivity')
+                    elseif reason == CLOSE_REASON.PLAYER then
+                        msg = JGRReportsT('notify_report_closed_by_you')
+                    else
+                        msg = JGRReportsT('notify_report_closed')
+                    end
+                    JGR_Fw.Notify(targetPlayer:getSource(), msg, 'primary')
+                    TriggerClientEvent('jgr_reports:client:reportClosed', targetPlayer:getSource())
+                end
+
+                if adminCid and reason == CLOSE_REASON.INACTIVITY then
+                    local adminPlayer = JGR_Fw.GetPlayerByIdentifier(adminCid)
+                    if adminPlayer then
+                        JGR_Fw.Notify(adminPlayer:getSource(), JGRReportsT('notify_report_inactivity_staff', reportId), 'primary')
+                    end
+                end
+
+                if adminCid and reason == CLOSE_REASON.PLAYER then
+                    local adminPlayer = JGR_Fw.GetPlayerByIdentifier(adminCid)
+                    if adminPlayer and (not staffCloserSrc or adminPlayer:getSource() ~= staffCloserSrc) then
+                        local who = closedByName or JGRReportsT('ui_unknown')
+                        JGR_Fw.Notify(adminPlayer:getSource(), JGRReportsT('notify_report_closed_by_player_staff', who), 'primary')
+                    end
+                end
+
+                if staffCloserSrc and reason == CLOSE_REASON.STAFF then
+                    JGR_Fw.Notify(staffCloserSrc, JGRReportsT('notify_report_closed_staff_ok'), 'success')
+                end
+
+                NotifyAdminsReportStale()
+            end)
+        end
+    )
 end
 
 -- ==========================================
@@ -57,54 +121,89 @@ CreateThread(function()
                     print('^2[JGR_Reports] ^0Columna sender_id añadida a jgr_report_messages.^0')
                 end
             end)
+            MySQL.query("SHOW COLUMNS FROM jgr_reports LIKE 'close_reason'", {}, function(cols)
+                if #cols == 0 then
+                    MySQL.query("ALTER TABLE jgr_reports ADD COLUMN `close_reason` varchar(32) DEFAULT NULL AFTER `adminName`")
+                    MySQL.query("ALTER TABLE jgr_reports ADD COLUMN `closed_by_citizenid` varchar(50) DEFAULT NULL AFTER `close_reason`")
+                    MySQL.query("ALTER TABLE jgr_reports ADD COLUMN `closed_by_name` varchar(100) DEFAULT NULL AFTER `closed_by_citizenid`")
+                    MySQL.query("ALTER TABLE jgr_reports ADD COLUMN `player_offline_since` timestamp NULL DEFAULT NULL AFTER `closed_by_name`")
+                    print('^2[JGR_Reports] ^0Columnas de cierre e inactividad añadidas.^0')
+                end
+            end)
             print('^2[JGR_Reports] ^0Database tables already exist. Skipping import.^0')
         end
     end)
 end)
 
--- ==========================================
--- COMANDOS
--- ==========================================
-QBCore.Commands.Add(Config.CommandPlayer, "Abrir sistema de reportes", {}, false, function(source, args)
-    local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if not Player then return end
-    
-    -- Verificar si tiene un reporte activo
-    MySQL.query("SELECT * FROM jgr_reports WHERE citizenid = ? AND status IN ('Abierto', 'En progreso') LIMIT 1", {Player.PlayerData.citizenid}, function(result)
-        if result[1] then
-            TriggerClientEvent('jgr_reports:client:openActiveReport', src, result[1])
-        else
-            TriggerClientEvent('jgr_reports:client:openCreateForm', src)
-        end
-    end)
-end)
-
-QBCore.Commands.Add(Config.CommandAdmin, "Abrir panel de reportes (Admin)", {}, false, function(source, args)
-    local src = source
-    if QBCore.Functions.HasPermission(src, Config.AdminGroups) then
-        TriggerClientEvent('jgr_reports:client:openAdminPanel', src)
-    else
-        TriggerClientEvent('QBCore:Notify', src, 'No tienes permisos', 'error')
+CreateThread(function()
+    Wait(8000)
+    local interval = Config.StatusCheckIntervalMs or 60000
+    while true do
+        MySQL.query(
+            "SELECT id, citizenid, player_offline_since FROM jgr_reports WHERE status IN ('Abierto', 'En progreso')",
+            {},
+            function(rows)
+                for _, row in ipairs(rows or {}) do
+                    local target = JGR_Fw.GetPlayerByIdentifier(row.citizenid)
+                    if target then
+                        MySQL.update(
+                            'UPDATE jgr_reports SET player_offline_since = NULL, serverId = ? WHERE id = ?',
+                            { target:getSource(), row.id }
+                        )
+                    elseif row.player_offline_since then
+                        MySQL.query(
+                            [[SELECT id FROM jgr_reports WHERE id = ? AND status IN ('Abierto', 'En progreso')
+                                AND player_offline_since IS NOT NULL
+                                AND TIMESTAMPDIFF(MINUTE, player_offline_since, NOW()) >= ?]],
+                            { row.id, Config.AutoCloseOfflineMinutes or 10 },
+                            function(expired)
+                                if expired[1] then
+                                    CloseReportInternal(row.id, CLOSE_REASON.INACTIVITY, nil, nil, nil)
+                                end
+                            end
+                        )
+                    else
+                        MySQL.update(
+                            'UPDATE jgr_reports SET player_offline_since = NOW() WHERE id = ? AND player_offline_since IS NULL',
+                            { row.id }
+                        )
+                    end
+                end
+            end
+        )
+        Wait(interval)
     end
 end)
 
--- ==========================================
--- CALLBACKS Y EVENTOS
--- ==========================================
-QBCore.Functions.CreateCallback('jgr_reports:server:createReport', function(source, cb, data)
+AddEventHandler('playerDropped', function()
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if not Player then return cb(false) end
-    
+    local cid = JGR_Fw.GetDroppedCitizenId(src)
+    if not cid then return end
+    MySQL.update(
+        [[UPDATE jgr_reports SET player_offline_since = COALESCE(player_offline_since, NOW()), serverId = NULL
+            WHERE citizenid = ? AND status IN ('Abierto', 'En progreso')]],
+        { cid }
+    )
+end)
+
+-- ==========================================
+-- CALLBACKS Y EVENTOS (comandos en bridge/sv_bridge.lua)
+-- ==========================================
+JGR_Fw.CreateCallback('jgr_reports:server:createReport', function(source, cb, data)
+    local src = source
+    local P = JGR_Fw.GetPlayer(src)
+    if not P then return cb(false) end
+
     local title = data.title
     local description = data.description
     local priority = data.priority
     local steamName = GetSteamName(src)
-    
+    local charName = P:getCharName()
+    local firstShort = (charName:match('^(%S+)') or charName)
+
     MySQL.insert("INSERT INTO jgr_reports (citizenid, playerName, steamName, serverId, title, description, priority) VALUES (?, ?, ?, ?, ?, ?, ?)", {
-        Player.PlayerData.citizenid, 
-        Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname,
+        P:getIdentifier(),
+        charName,
         steamName,
         src,
         title,
@@ -112,11 +211,9 @@ QBCore.Functions.CreateCallback('jgr_reports:server:createReport', function(sour
         priority
     }, function(id)
         if id then
-            -- Notificar admins conectados
-            local players = QBCore.Functions.GetPlayers()
-            for _, v in pairs(players) do
-                if QBCore.Functions.HasPermission(v, Config.AdminGroups) then
-                    TriggerClientEvent('QBCore:Notify', v, 'Nuevo reporte recibido de '..Player.PlayerData.charinfo.firstname..' [ID:'..src..']', 'primary', 5000)
+            for _, v in ipairs(JGR_Fw.GetAllPlayerSources()) do
+                if JGR_Fw.IsStaff(v) then
+                    JGR_Fw.Notify(v, JGRReportsT('notify_new_report', firstShort, src), 'primary', 5000)
                 end
             end
             cb(id)
@@ -126,41 +223,42 @@ QBCore.Functions.CreateCallback('jgr_reports:server:createReport', function(sour
     end)
 end)
 
-QBCore.Functions.CreateCallback('jgr_reports:server:getActiveReports', function(source, cb)
-    local src = source
-    if not QBCore.Functions.HasPermission(src, Config.AdminGroups) then return cb({}) end
-    
-    MySQL.query("SELECT * FROM jgr_reports WHERE status IN ('Abierto', 'En progreso') ORDER BY created_at DESC", {}, function(result)
+JGR_Fw.CreateCallback('jgr_reports:server:getActiveReports', function(source, cb)
+    if not JGR_Fw.IsStaff(source) then return cb({}) end
+
+    MySQL.query('SELECT * FROM jgr_reports WHERE status IN (\'Abierto\', \'En progreso\') ORDER BY created_at DESC', {}, function(result)
+        for _, rep in ipairs(result or {}) do
+            local target = JGR_Fw.GetPlayerByIdentifier(rep.citizenid)
+            rep.reporterOnline = target ~= nil
+            rep.reporterServerId = target and target:getSource() or nil
+        end
         cb(result)
     end)
 end)
 
-QBCore.Functions.CreateCallback('jgr_reports:server:getReportHistory', function(source, cb)
-    local src = source
-    if not QBCore.Functions.HasPermission(src, Config.AdminGroups) then return cb({}) end
-    
+JGR_Fw.CreateCallback('jgr_reports:server:getReportHistory', function(source, cb)
+    if not JGR_Fw.IsStaff(source) then return cb({}) end
+
     MySQL.query("SELECT * FROM jgr_reports WHERE status = 'Cerrado' ORDER BY updated_at DESC LIMIT 50", {}, function(result)
         cb(result)
     end)
 end)
 
-QBCore.Functions.CreateCallback('jgr_reports:server:getMessages', function(source, cb, reportId)
+JGR_Fw.CreateCallback('jgr_reports:server:getMessages', function(source, cb, reportId)
     MySQL.query("SELECT * FROM jgr_report_messages WHERE report_id = ? ORDER BY created_at ASC", {reportId}, function(result)
         cb(result)
     end)
 end)
 
--- Callback para obtener lista de staff activo (para la UI del jugador)
-QBCore.Functions.CreateCallback('jgr_reports:server:getActiveStaff', function(source, cb)
+JGR_Fw.CreateCallback('jgr_reports:server:getActiveStaff', function(source, cb)
     local staffList = {}
-    local players = QBCore.Functions.GetPlayers()
-    for _, v in pairs(players) do
-        if QBCore.Functions.HasPermission(v, Config.AdminGroups) then
-            local staffPlayer = QBCore.Functions.GetPlayer(v)
-            if staffPlayer then
+    for _, v in ipairs(JGR_Fw.GetAllPlayerSources()) do
+        if JGR_Fw.IsStaff(v) then
+            local sp = JGR_Fw.GetPlayer(v)
+            if sp then
                 table.insert(staffList, {
                     serverId = v,
-                    name = staffPlayer.PlayerData.charinfo.firstname .. " " .. staffPlayer.PlayerData.charinfo.lastname,
+                    name = sp:getCharName(),
                     steamName = GetSteamName(v)
                 })
             end
@@ -171,19 +269,19 @@ end)
 
 RegisterNetEvent('jgr_reports:server:takeReport', function(reportId)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if not Player or not QBCore.Functions.HasPermission(src, Config.AdminGroups) then return end
-    
-    local adminName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
-    
-    MySQL.update("UPDATE jgr_reports SET status = 'En progreso', adminCitizenid = ?, adminName = ? WHERE id = ?", {Player.PlayerData.citizenid, adminName, reportId}, function(affectedRows)
+    local P = JGR_Fw.GetPlayer(src)
+    if not P or not JGR_Fw.IsStaff(src) then return end
+
+    local adminName = P:getCharName()
+
+    MySQL.update("UPDATE jgr_reports SET status = 'En progreso', adminCitizenid = ?, adminName = ? WHERE id = ?", { P:getIdentifier(), adminName, reportId }, function(affectedRows)
         if affectedRows > 0 then
-            -- Buscar jugador original y notificarle
-            MySQL.query("SELECT serverId FROM jgr_reports WHERE id = ?", {reportId}, function(res)
-                if res[1] and res[1].serverId then
-                    local targetId = res[1].serverId
-                    TriggerClientEvent('QBCore:Notify', targetId, 'El staff ' .. adminName .. ' está atendiendo tu reporte', 'success')
-                    TriggerClientEvent('jgr_reports:client:updateReportData', targetId)
+            MySQL.query('SELECT citizenid FROM jgr_reports WHERE id = ?', { reportId }, function(res)
+                if not res[1] or not res[1].citizenid then return end
+                local targetPlayer = JGR_Fw.GetPlayerByIdentifier(res[1].citizenid)
+                if targetPlayer then
+                    JGR_Fw.Notify(targetPlayer:getSource(), JGRReportsT('notify_staff_attending', adminName), 'success')
+                    TriggerClientEvent('jgr_reports:client:updateReportData', targetPlayer:getSource())
                 end
             end)
         end
@@ -192,10 +290,10 @@ end)
 
 RegisterNetEvent('jgr_reports:server:sendMessage', function(reportId, message, isAdmin)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if not Player then return end
-    
-    local charName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
+    local P = JGR_Fw.GetPlayer(src)
+    if not P then return end
+
+    local charName = P:getCharName()
     local steamName = GetSteamName(src)
     -- El sender guardado incluye nombre de personaje + steam name + ID
     local senderDisplay
@@ -212,26 +310,22 @@ RegisterNetEvent('jgr_reports:server:sendMessage', function(reportId, message, i
             -- Tenemos que enviarle el nuevo mensaje al otro extremo.
             MySQL.query("SELECT citizenid, adminCitizenid FROM jgr_reports WHERE id = ?", {reportId}, function(res)
                 if res[1] then
-                    local targetPlayer = QBCore.Functions.GetPlayerByCitizenId(res[1].citizenid)
-                    local targetSrc = targetPlayer and targetPlayer.PlayerData.source or nil
-                    
-                    -- Si es el admin quien envía, notificar al jugador
+                    local targetPlayer = JGR_Fw.GetPlayerByIdentifier(res[1].citizenid)
+                    local targetSrc = targetPlayer and targetPlayer:getSource() or nil
+
                     if isAdmin and targetSrc then
                         TriggerClientEvent('jgr_reports:client:receiveMessage', targetSrc, msgId, senderDisplay, message, isAdmin)
                     end
-                    
-                    -- Si es el jugador quien envía, notificar al admin
+
                     if not isAdmin and res[1].adminCitizenid then
-                        local adminPlayer = QBCore.Functions.GetPlayerByCitizenId(res[1].adminCitizenid)
+                        local adminPlayer = JGR_Fw.GetPlayerByIdentifier(res[1].adminCitizenid)
                         if adminPlayer then
-                            TriggerClientEvent('jgr_reports:client:receiveMessage', adminPlayer.PlayerData.source, msgId, senderDisplay, message, isAdmin)
+                            TriggerClientEvent('jgr_reports:client:receiveMessage', adminPlayer:getSource(), msgId, senderDisplay, message, isAdmin)
                         end
                     end
-                    
-                    -- Notificar también a los demás admins que estén viendo el reporte
-                    local players = QBCore.Functions.GetPlayers()
-                    for _, v in pairs(players) do
-                        if v ~= src and QBCore.Functions.HasPermission(v, Config.AdminGroups) then
+
+                    for _, v in ipairs(JGR_Fw.GetAllPlayerSources()) do
+                        if v ~= src and JGR_Fw.IsStaff(v) then
                             TriggerClientEvent('jgr_reports:client:receiveMessage', v, msgId, senderDisplay, message, isAdmin)
                         end
                     end
@@ -246,28 +340,21 @@ end)
 
 RegisterNetEvent('jgr_reports:server:closeReport', function(reportId)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if not Player then return end
-    
-    local isAdmin = QBCore.Functions.HasPermission(src, Config.AdminGroups)
-    
-    MySQL.query("SELECT citizenid FROM jgr_reports WHERE id = ?", {reportId}, function(res)
-        if res[1] then
-            if isAdmin or res[1].citizenid == Player.PlayerData.citizenid then
-                MySQL.update("UPDATE jgr_reports SET status = 'Cerrado' WHERE id = ?", {reportId}, function(affectedRows)
-                    if affectedRows > 0 then
-                        local targetPlayer = QBCore.Functions.GetPlayerByCitizenId(res[1].citizenid)
-                        if targetPlayer then
-                            TriggerClientEvent('QBCore:Notify', targetPlayer.PlayerData.source, 'El reporte ha sido cerrado', 'primary')
-                            TriggerClientEvent('jgr_reports:client:reportClosed', targetPlayer.PlayerData.source)
-                        end
-                        if isAdmin and (not targetPlayer or targetPlayer.PlayerData.source ~= src) then
-                            TriggerClientEvent('QBCore:Notify', src, 'Reporte cerrado con éxito', 'success')
-                        end
-                    end
-                end)
-            end
-        end
+    local P = JGR_Fw.GetPlayer(src)
+    if not P then return end
+
+    local isAdmin = JGR_Fw.IsStaff(src)
+
+    MySQL.query('SELECT citizenid FROM jgr_reports WHERE id = ?', { reportId }, function(res)
+        if not res[1] then return end
+        if not isAdmin and res[1].citizenid ~= P:getIdentifier() then return end
+
+        local reason = isAdmin and CLOSE_REASON.STAFF or CLOSE_REASON.PLAYER
+        local name = GetCharacterFullName(P)
+        local cid = P:getIdentifier()
+        local staffCloser = isAdmin and src or nil
+
+        CloseReportInternal(reportId, reason, cid, name, staffCloser)
     end)
 end)
 
@@ -279,35 +366,38 @@ local activeCallChannels = {} -- { reportId = channel }
 
 RegisterNetEvent('jgr_reports:server:callPlayer', function(reportId)
     local src = source
-    if not QBCore.Functions.HasPermission(src, Config.AdminGroups) then return end
-    
-    MySQL.query("SELECT citizenid FROM jgr_reports WHERE id = ?", {reportId}, function(res)
+    if not JGR_Fw.IsStaff(src) then return end
+
+    MySQL.query("SELECT citizenid FROM jgr_reports WHERE id = ?", { reportId }, function(res)
         if res[1] and res[1].citizenid then
-            local targetPlayer = QBCore.Functions.GetPlayerByCitizenId(res[1].citizenid)
+            local targetPlayer = JGR_Fw.GetPlayerByIdentifier(res[1].citizenid)
             if targetPlayer then
-                local targetSrc = targetPlayer.PlayerData.source
-                -- Envía el evento al jugador para mostrar UI de recibir llamada
-                TriggerClientEvent('jgr_reports:client:receiveCall', targetSrc, src, reportId)
+                TriggerClientEvent('jgr_reports:client:receiveCall', targetPlayer:getSource(), src, reportId)
             else
-                TriggerClientEvent('QBCore:Notify', src, 'El jugador no está online', 'error')
+                JGR_Fw.Notify(src, JGRReportsT('notify_player_offline'), 'error')
             end
         else
-            TriggerClientEvent('QBCore:Notify', src, 'Reporte no válido', 'error')
+            JGR_Fw.Notify(src, JGRReportsT('notify_invalid_report'), 'error')
         end
     end)
 end)
 
 RegisterNetEvent('jgr_reports:server:answerCall', function(adminSrc, reportId)
     local src = source
-    
-    -- Generar un canal aleatorio alto para no pisar canales de policía u otros reportes
-    local channel = math.random(8000, 9999)
-    activeCallChannels[reportId] = channel
-    
-    -- Notificar al admin que contestó
-    TriggerClientEvent('jgr_reports:client:callAnswered', adminSrc, channel)
-    -- Asignar canal al jugador (el cliente lo hace)
-    TriggerClientEvent('jgr_reports:client:callAnswered', src, channel)
+    if not adminSrc or not reportId then return end
+
+    local P = JGR_Fw.GetPlayer(src)
+    if not P then return end
+
+    MySQL.query('SELECT citizenid FROM jgr_reports WHERE id = ?', { reportId }, function(res)
+        if not res[1] or res[1].citizenid ~= P:getIdentifier() then return end
+
+        local channel = math.random(8000, 9999)
+        activeCallChannels[reportId] = channel
+
+        TriggerClientEvent('jgr_reports:client:callAnswered', adminSrc, channel)
+        TriggerClientEvent('jgr_reports:client:callAnswered', src, channel)
+    end)
 end)
 
 RegisterNetEvent('jgr_reports:server:declineCall', function(adminSrc)
@@ -323,16 +413,15 @@ RegisterNetEvent('jgr_reports:server:hangUp', function(reportId)
     MySQL.query("SELECT citizenid, adminCitizenid FROM jgr_reports WHERE id = ?", {reportId}, function(res)
         if res[1] then
             -- Manda evento de Colgar al creador del reporte
-            local targetPlayer = QBCore.Functions.GetPlayerByCitizenId(res[1].citizenid)
+            local targetPlayer = JGR_Fw.GetPlayerByIdentifier(res[1].citizenid)
             if targetPlayer then
-                TriggerClientEvent('jgr_reports:client:callEnded', targetPlayer.PlayerData.source)
+                TriggerClientEvent('jgr_reports:client:callEnded', targetPlayer:getSource())
             end
-            
-            -- Manda evento de Colgar al administrador que lo atendía
+
             if res[1].adminCitizenid then
-                local adminPlayer = QBCore.Functions.GetPlayerByCitizenId(res[1].adminCitizenid)
+                local adminPlayer = JGR_Fw.GetPlayerByIdentifier(res[1].adminCitizenid)
                 if adminPlayer then
-                    TriggerClientEvent('jgr_reports:client:callEnded', adminPlayer.PlayerData.source)
+                    TriggerClientEvent('jgr_reports:client:callEnded', adminPlayer:getSource())
                 end
             end
             

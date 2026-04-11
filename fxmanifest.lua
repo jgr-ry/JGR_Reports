@@ -2,21 +2,25 @@ fx_version 'cerulean'
 game 'gta5'
 
 author 'JGR Studio'
-description 'Sistema Avanzado de Reportes'
-version '1.0.0'
+description 'Sistema de reportes multi-framework (QB / Qbox / ESX / Standalone)'
+version '1.0.0.0'
 
 shared_scripts {
-    '@qb-core/shared/locale.lua',
-    'config.lua'
+    'locales/en.lua',
+    'locales/es.lua',
+    'config.lua',
+    'locale_shared.lua',
 }
 
 client_scripts {
-    'client/client.lua'
+    'bridge/cl_bridge.lua',
+    'client/client.lua',
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
-    'server/server.lua'
+    'bridge/sv_bridge.lua',
+    'server/server.lua',
 }
 
 ui_page 'html/index.html'
@@ -26,9 +30,18 @@ files {
     'html/style.css',
     'html/script.js',
     'html/images/*.png',
-    'install.sql'
+    'install.sql',
 }
 
 escrow_ignore {
-    'config.lua'
+    'config.lua',
+    'locales/en.lua',
+    'locales/es.lua',
+    'locale_shared.lua',
+    'bridge/cl_bridge.lua',
+    'bridge/sv_bridge.lua',
+}
+
+dependencies {
+    'oxmysql',
 }

@@ -1022,7 +1022,7 @@ body {
 }
 
 /* ==========================================
-   CHAT REPORT INFO (Header del chat - admin)
+   CHAT REPORT INFO (legacy / reservado)
    ========================================== */
 .chat-report-info {
     font-size: 0.78rem;
@@ -1034,6 +1034,83 @@ body {
     line-height: 1.6;
     max-width: 90%;
     text-align: center;
+}
+
+/* Resumen bajo el header (solo staff): prioridad + descripción */
+.chat-header {
+    flex-shrink: 0;
+}
+
+.chat-admin-summary {
+    flex-shrink: 0;
+    padding: 12px 18px 14px;
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.chat-summary-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.chat-summary-head {
+    margin-bottom: 8px;
+}
+
+.chat-prio-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.chat-prio-badge.prio-baja {
+    background: rgba(48, 209, 88, 0.22);
+    color: #30d158;
+}
+
+.chat-prio-badge.prio-media {
+    background: rgba(255, 159, 10, 0.22);
+    color: #ff9f0a;
+}
+
+.chat-prio-badge.prio-alta {
+    background: rgba(255, 69, 58, 0.22);
+    color: #ff453a;
+}
+
+.chat-summary-desc {
+    font-size: 0.86rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 120px;
+    overflow-y: auto;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 0.5px solid rgba(255, 255, 255, 0.06);
+}
+
+.chat-summary-meta {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 0.5px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.chat-summary-meta-line {
+    display: block;
 }
 
 .chat-steam {
@@ -1081,6 +1158,79 @@ body {
 .card-staff-name {
     color: #64d2ff;
     font-weight: 600;
+}
+
+/* Presencia del reportante (lista activa + chat admin) */
+.presence-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.card-presence,
+.reporter-presence {
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-left: 6px;
+    white-space: nowrap;
+}
+
+.presence-live .presence-dot,
+.reporter-live .presence-dot {
+    background: var(--success);
+}
+
+.presence-offline .presence-dot,
+.reporter-offline .presence-dot {
+    background: var(--danger);
+}
+
+.presence-offline,
+.reporter-offline {
+    color: #ff6b6b;
+}
+
+.presence-live,
+.reporter-live {
+    color: #5ae689;
+}
+
+.card-reporter-offline {
+    border-color: rgba(255, 69, 58, 0.35);
+}
+
+/* Historial: cierre (rojo = quién cerró / motivo) */
+.history-close {
+    margin: 8px 0 0 0;
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+.history-close-by,
+.history-close-inactivity {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.history-close-label {
+    margin-right: 4px;
+}
+
+.history-closer-name {
+    color: #ff6961;
+    font-weight: 700;
+}
+
+.history-close-inactivity {
+    font-weight: 600;
+}
+
+.history-close-legacy {
+    color: #8e8e93;
+    font-weight: 500;
 }
 
 /* === GLOBAL: Eliminar todas las sombras/filtros en la UI === */

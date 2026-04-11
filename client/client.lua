@@ -1,20 +1,30 @@
-local QBCore = exports[Config.CoreName]:GetCoreObject()
 local isInUI = false
+
+local function NuiLocalePayload()
+    return {
+        strings = JGRReportsGetNuiLocale(),
+        localeLang = Config.Locale or 'es',
+    }
+end
 local currentCallChannel = 0
 local activeAdminCallerSrc = nil
 local activeCallTargetSrc = nil
 
 -- Uso de pma-voice para llamadas (Call Channel en vez de Radio para evitar Push-to-Talk)
 local function JoinCallChannel(channel)
-    exports['pma-voice']:setCallChannel(channel)
+    pcall(function()
+        exports['pma-voice']:setCallChannel(channel)
+    end)
     currentCallChannel = channel
-    QBCore.Functions.Notify('Conectado a la llamada de soporte.', 'success')
+    JGR_FW.Notify(JGRReportsT('notify_call_joined'), 'success')
 end
 
 local function LeaveCallChannel()
-    exports['pma-voice']:setCallChannel(0)
+    pcall(function()
+        exports['pma-voice']:setCallChannel(0)
+    end)
     currentCallChannel = 0
-    QBCore.Functions.Notify('Llamada finalizada.', 'primary')
+    JGR_FW.Notify(JGRReportsT('notify_call_left'), 'primary')
 end
 
 -- ==========================================
@@ -40,38 +50,47 @@ end)
 RegisterNetEvent('jgr_reports:client:openCreateForm', function()
     OpenNUI()
     -- Cargar lista de staff activo para mostrarlo al jugador
-    QBCore.Functions.TriggerCallback('jgr_reports:server:getActiveStaff', function(staffList)
-        SendNUIMessage({ action = "open_create", staffList = staffList })
+    JGR_FW.TriggerCallback('jgr_reports:server:getActiveStaff', function(staffList)
+        local loc = NuiLocalePayload()
+        SendNUIMessage({
+            action = "open_create",
+            staffList = staffList,
+            strings = loc.strings,
+            localeLang = loc.localeLang,
+        })
     end)
 end)
 
 RegisterNetEvent('jgr_reports:client:openActiveReport', function(reportData)
     OpenNUI()
-    QBCore.Functions.TriggerCallback('jgr_reports:server:getMessages', function(messages)
-        SendNUIMessage({ 
-            action = "open_chat", 
+    JGR_FW.TriggerCallback('jgr_reports:server:getMessages', function(messages)
+        local loc = NuiLocalePayload()
+        SendNUIMessage({
+            action = "open_chat",
             report = reportData,
             messages = messages,
-            isAdmin = false
+            isAdmin = false,
+            strings = loc.strings,
+            localeLang = loc.localeLang,
         })
     end, reportData.id)
 end)
 
 RegisterNUICallback('createReport', function(data, cb)
-    QBCore.Functions.TriggerCallback('jgr_reports:server:createReport', function(reportId)
+    JGR_FW.TriggerCallback('jgr_reports:server:createReport', function(reportId)
         if reportId then
-            QBCore.Functions.Notify('Reporte enviado con éxito.', 'success')
+            JGR_FW.Notify(JGRReportsT('notify_report_sent'), 'success')
             cb({ success = true })
         else
             cb({ success = false })
-            QBCore.Functions.Notify('Error al enviar el reporte.', 'error')
+            JGR_FW.Notify(JGRReportsT('notify_report_fail'), 'error')
         end
     end, data)
 end)
 
 RegisterNetEvent('jgr_reports:client:updateReportData', function()
     if isInUI then
-        QBCore.Functions.Notify('Un admin ha tomado tu reporte. Se ha actualizado el estado.', 'success')
+        JGR_FW.Notify(JGRReportsT('notify_report_taken'), 'success')
     end
 end)
 
@@ -86,17 +105,27 @@ end)
 -- ==========================================
 RegisterNetEvent('jgr_reports:client:openAdminPanel', function()
     OpenNUI()
-    SendNUIMessage({ action = "open_admin" })
+    local loc = NuiLocalePayload()
+    SendNUIMessage({
+        action = "open_admin",
+        autoCloseMinutes = Config.AutoCloseOfflineMinutes or 10,
+        strings = loc.strings,
+        localeLang = loc.localeLang,
+    })
+end)
+
+RegisterNetEvent('jgr_reports:client:reportListStale', function()
+    SendNUIMessage({ action = "refresh_admin_lists" })
 end)
 
 RegisterNUICallback('loadReports', function(data, cb)
-    QBCore.Functions.TriggerCallback('jgr_reports:server:getActiveReports', function(reports)
+    JGR_FW.TriggerCallback('jgr_reports:server:getActiveReports', function(reports)
         cb(reports)
     end)
 end)
 
 RegisterNUICallback('loadHistory', function(data, cb)
-    QBCore.Functions.TriggerCallback('jgr_reports:server:getReportHistory', function(reports)
+    JGR_FW.TriggerCallback('jgr_reports:server:getReportHistory', function(reports)
         cb(reports)
     end)
 end)
@@ -109,12 +138,15 @@ end)
 
 RegisterNUICallback('openAdminChat', function(data, cb)
     local reportId = data.reportId
-    QBCore.Functions.TriggerCallback('jgr_reports:server:getMessages', function(messages)
-        SendNUIMessage({ 
-            action = "open_chat", 
+    JGR_FW.TriggerCallback('jgr_reports:server:getMessages', function(messages)
+        local loc = NuiLocalePayload()
+        SendNUIMessage({
+            action = "open_chat",
             report = data.report,
             messages = messages,
-            isAdmin = true
+            isAdmin = true,
+            strings = loc.strings,
+            localeLang = loc.localeLang,
         })
         cb('ok')
     end, reportId)
@@ -122,7 +154,7 @@ end)
 
 RegisterNUICallback('loadMessages', function(data, cb)
     local reportId = data.reportId
-    QBCore.Functions.TriggerCallback('jgr_reports:server:getMessages', function(messages)
+    JGR_FW.TriggerCallback('jgr_reports:server:getMessages', function(messages)
         cb(messages)
     end, reportId)
 end)
@@ -164,12 +196,15 @@ end)
 RegisterNetEvent('jgr_reports:client:receiveCall', function(adminSrc, reportId)
     activeAdminCallerSrc = adminSrc
     -- Notificación en pantalla
-    QBCore.Functions.Notify('Llamada entrante de Soporte...', 'primary', 5000)
+    JGR_FW.Notify(JGRReportsT('notify_call_incoming'), 'primary', 5000)
     -- Forzar a que la UI se abra para que el jugador pueda ver la llamada
     OpenNUI()
+    local loc = NuiLocalePayload()
     SendNUIMessage({
         action = "incoming_call",
-        reportId = reportId
+        reportId = reportId,
+        strings = loc.strings,
+        localeLang = loc.localeLang,
     })
     PlaySoundFrontend(-1, "Phone_Ring", "Phone_SoundSet_Default", 1)
 end)
@@ -189,7 +224,7 @@ end)
 
 -- Admin recibe notificación si es rechazada
 RegisterNetEvent('jgr_reports:client:callDeclined', function()
-    QBCore.Functions.Notify('Llamada rechazada por el jugador.', 'error')
+    JGR_FW.Notify(JGRReportsT('notify_call_declined'), 'error')
     SendNUIMessage({ action = "call_declined" })
 end)
 

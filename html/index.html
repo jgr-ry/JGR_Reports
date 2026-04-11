@@ -1,11 +1,10 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JGR Reports - Advanced iOS Style</title>
-    <!-- Incluimos San Francisco font fallback y UI Icons -->
+    <title id="page-title">JGR Reports</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -14,50 +13,48 @@
 <body>
     <div id="app" style="display: none;">
 
-        <!-- VISTA DE CREACIÓN DE REPORTE (JUGADOR) -->
         <div id="create-report-view" class="view hidden">
             <div class="header">
                 <div class="header-left">
                     <div class="header-icon"><i class="fa-solid fa-headset"></i></div>
-                    <h2>Soporte en línea</h2>
+                    <h2 data-i18n="ui_support_title">Live support</h2>
                 </div>
                 <button class="close-btn ui-sound" data-sound="hover"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="content">
-                <!-- Staff activo -->
                 <div id="staff-online-section" class="staff-online-section">
                     <div class="staff-online-header">
                         <span class="staff-online-dot"></span>
-                        <span id="staff-online-label">Cargando staff...</span>
+                        <span id="staff-online-label" data-i18n="ui_staff_loading">…</span>
                     </div>
                     <div id="staff-online-list" class="staff-online-list"></div>
                 </div>
 
                 <form id="create-report-form">
                     <div class="input-group">
-                        <label>Título del incidente</label>
-                        <input type="text" id="report-title" placeholder="Ej. Bug visual en inventario" required
-                            autocomplete="off">
+                        <label data-i18n="ui_incident_title_label">Title</label>
+                        <input type="text" id="report-title" data-i18n-placeholder="ui_incident_title_ph" placeholder=""
+                            required autocomplete="off">
                     </div>
                     <div class="input-group">
-                        <label>Descripción detallada</label>
-                        <textarea id="report-desc" rows="4" placeholder="Explica tu problema lo más claro posible..."
+                        <label data-i18n="ui_desc_label">Description</label>
+                        <textarea id="report-desc" rows="4" data-i18n-placeholder="ui_desc_ph" placeholder=""
                             required></textarea>
                     </div>
                     <div class="input-group">
-                        <label>Prioridad</label>
+                        <label data-i18n="ui_priority_label">Priority</label>
                         <div class="priority-buttons">
                             <button type="button" class="btn-priority baja active ui-sound" data-sound="click"
-                                data-prio="Baja">Baja</button>
+                                data-prio="Baja" data-i18n="ui_prio_baja">Low</button>
                             <button type="button" class="btn-priority media ui-sound" data-sound="click"
-                                data-prio="Media">Media</button>
+                                data-prio="Media" data-i18n="ui_prio_media">Medium</button>
                             <button type="button" class="btn-priority alta ui-sound" data-sound="click"
-                                data-prio="Alta">Alta</button>
+                                data-prio="Alta" data-i18n="ui_prio_alta">High</button>
                         </div>
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="btn-primary ui-sound" data-sound="success">
-                            <span>Enviar Reporte</span>
+                            <span data-i18n="ui_send_report">Submit</span>
                             <i class="fa-solid fa-paper-plane"></i>
                         </button>
                     </div>
@@ -65,112 +62,103 @@
             </div>
         </div>
 
-        <!-- PANEL DE ADMIN -->
         <div id="admin-panel-view" class="view admin-view-container hidden">
             <div class="header admin-header">
-                <h2>Panel de Administración</h2>
+                <h2 data-i18n="ui_admin_panel">Admin panel</h2>
                 <button class="close-btn ui-sound" data-sound="hover"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
             <div class="admin-toolbar">
                 <div class="ios-search-bar">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="search-input" placeholder="Buscar por Nombre, ID o Título..."
+                    <input type="text" id="search-input" data-i18n-placeholder="ui_search_ph" placeholder=""
                         autocomplete="off">
                 </div>
             </div>
 
             <div class="ios-segmented-control">
                 <div class="segmented-control-bg"></div>
-                <button class="segment-btn active ui-sound" data-sound="click"
-                    data-tab="active-reports">Activos</button>
-                <button class="segment-btn ui-sound" data-sound="click" data-tab="history-reports">Historial</button>
+                <button type="button" class="segment-btn active ui-sound" data-sound="click"
+                    data-tab="active-reports" data-i18n="ui_tab_active">Active</button>
+                <button type="button" class="segment-btn ui-sound" data-sound="click" data-tab="history-reports"
+                    data-i18n="ui_tab_history">History</button>
             </div>
             <div class="content admin-content">
-                <div id="active-reports" class="tab-content active">
-                    <!-- Cards here -->
-                </div>
-                <div id="history-reports" class="tab-content hidden">
-                    <!-- Cards here -->
-                </div>
+                <div id="active-reports" class="tab-content active"></div>
+                <div id="history-reports" class="tab-content hidden"></div>
             </div>
         </div>
 
-        <!-- VISTA DE CHAT (LIVE CHAT) -->
         <div id="chat-view" class="view hidden">
             <div class="header chat-header">
                 <div class="header-left">
-                    <button class="close-btn back-btn ui-sound" data-sound="click"><i
+                    <button type="button" class="close-btn back-btn ui-sound" data-sound="click"><i
                             class="fa-solid fa-chevron-left"></i></button>
                     <div class="chat-info-header">
-                        <h2 id="chat-title">Reporte #1</h2>
-                        <span id="chat-status" class="status-dot online">En progreso</span>
+                        <h2 id="chat-title">#1</h2>
+                        <span id="chat-status" class="status-dot online">…</span>
                     </div>
                 </div>
-                <!-- Info jugador/staff (solo visible para admin) -->
-                <div id="chat-report-info" class="chat-report-info" style="display:none;"></div>
-                <!-- Menú contextual estilo iOS -->
-                <button id="chat-options-btn" class="icon-btn ui-sound" data-sound="hover"><i
+                <button type="button" id="chat-options-btn" class="icon-btn ui-sound" data-sound="hover"><i
                         class="fa-solid fa-ellipsis"></i></button>
 
-                <!-- Drodown menú oculto -->
                 <div id="chat-options-menu" class="ios-dropdown hidden">
-                    <button id="call-btn" class="dropdown-item call ui-sound" data-sound="success"><i
-                            class="fa-solid fa-phone"></i> Llamar al Jugador</button>
-                    <button id="close-report-btn" class="dropdown-item danger ui-sound" data-sound="error"><i
-                            class="fa-solid fa-box-archive"></i> Cerrar Reporte</button>
+                    <button type="button" id="call-btn" class="dropdown-item call ui-sound" data-sound="success"><i
+                            class="fa-solid fa-phone"></i> <span data-i18n="ui_call_player">Call</span></button>
+                    <button type="button" id="close-report-btn" class="dropdown-item danger ui-sound"
+                        data-sound="error"><i class="fa-solid fa-box-archive"></i> <span
+                            data-i18n="ui_close_report">Close</span></button>
                 </div>
             </div>
 
-            <div id="chat-messages" class="messages-container">
-                <!-- Mensajes -->
-            </div>
+            <div id="chat-admin-summary" class="chat-admin-summary hidden"></div>
+
+            <div id="chat-messages" class="messages-container"></div>
 
             <div class="chat-input-area" id="chat-input-area">
                 <div class="input-wrapper">
-                    <input type="text" id="chat-input" placeholder="Escribe un mensaje..." autocomplete="off">
-                    <button id="send-msg-btn" class="btn-icon send ui-sound" data-sound="message"><i
+                    <input type="text" id="chat-input" data-i18n-placeholder="ui_chat_input_ph" placeholder=""
+                        autocomplete="off">
+                    <button type="button" id="send-msg-btn" class="btn-icon send ui-sound" data-sound="message"><i
                             class="fa-solid fa-arrow-up"></i></button>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL DE LLAMADA ENTRANTE -->
         <div id="incoming-call-modal" class="modal hidden">
             <div class="blur-bg"></div>
             <div class="ios-call-screen">
                 <div class="call-header-info">
-                    <p class="call-subtitle">Soporte Administrativo</p>
-                    <h2 class="call-title">Llamando...</h2>
+                    <p class="call-subtitle" data-i18n="ui_call_subtitle">Support</p>
+                    <h2 class="call-title" data-i18n="ui_call_ringing">Calling…</h2>
                 </div>
                 <div class="call-actions-row">
                     <div class="action-wrap">
-                        <button id="decline-call-btn" class="call-btn-circular danger ui-sound" data-sound="error"><i
-                                class="fa-solid fa-phone-slash"></i></button>
-                        <span>Rechazar</span>
+                        <button type="button" id="decline-call-btn" class="call-btn-circular danger ui-sound"
+                            data-sound="error"><i class="fa-solid fa-phone-slash"></i></button>
+                        <span data-i18n="ui_decline">Decline</span>
                     </div>
                     <div class="action-wrap">
-                        <button id="answer-call-btn" class="call-btn-circular success ui-sound" data-sound="success"><i
-                                class="fa-solid fa-phone"></i></button>
-                        <span>Aceptar</span>
+                        <button type="button" id="answer-call-btn" class="call-btn-circular success ui-sound"
+                            data-sound="success"><i class="fa-solid fa-phone"></i></button>
+                        <span data-i18n="ui_accept">Accept</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL LLAMADA ACTIVA -->
         <div id="active-call-modal" class="modal hidden">
             <div class="blur-bg active-bg"></div>
             <div class="ios-call-screen">
                 <div class="call-header-info">
-                    <p class="call-subtitle">Soporte Administrativo</p>
+                    <p class="call-subtitle" data-i18n="ui_call_subtitle">Support</p>
                     <h2 class="call-title" id="call-timer">00:00</h2>
                 </div>
                 <div class="call-actions-row center-action">
                     <div class="action-wrap">
-                        <button id="hangup-call-btn" class="call-btn-circular danger ui-sound" data-sound="error"><i
-                                class="fa-solid fa-phone-slash"></i></button>
-                        <span>Colgar</span>
+                        <button type="button" id="hangup-call-btn" class="call-btn-circular danger ui-sound"
+                            data-sound="error"><i class="fa-solid fa-phone-slash"></i></button>
+                        <span data-i18n="ui_hangup">Hang up</span>
                     </div>
                 </div>
             </div>
