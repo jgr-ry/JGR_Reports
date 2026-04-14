@@ -267,7 +267,11 @@ function JGR_Fw.RegisterCommands()
         if not P then return end
         MySQL.query('SELECT * FROM jgr_reports WHERE citizenid = ? AND status IN (\'Abierto\', \'En progreso\') LIMIT 1', { P:getIdentifier() }, function(result)
             if result[1] then
-                TriggerClientEvent('jgr_reports:client:openActiveReport', src, result[1])
+                -- El jugador no debe recibir nombre de personaje ni Steam en el NUI (solo staff lo ve en panel)
+                local row = result[1]
+                row.playerName = nil
+                row.steamName = nil
+                TriggerClientEvent('jgr_reports:client:openActiveReport', src, row)
             else
                 TriggerClientEvent('jgr_reports:client:openCreateForm', src)
             end

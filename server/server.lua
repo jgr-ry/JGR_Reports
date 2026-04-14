@@ -8,13 +8,6 @@ local function GetSteamName(src)
     return GetPlayerName(src) or JGRReportsT('ui_unknown')
 end
 
-local function GetCharacterFullName(P)
-    if not P then return JGRReportsT('ui_unknown') end
-    local n = P:getCharName()
-    if not n or n == '' then return JGRReportsT('ui_unknown') end
-    return n
-end
-
 local function NotifyAdminsReportStale()
     for _, v in ipairs(JGR_Fw.GetAllPlayerSources()) do
         if JGR_Fw.IsStaff(v) then
@@ -203,7 +196,7 @@ JGR_Fw.CreateCallback('jgr_reports:server:createReport', function(source, cb, da
     end
     local steamName = GetSteamName(src)
     local charName = P:getCharName()
-    local firstShort = (charName:match('^(%S+)') or charName)
+    local notifyShort = (steamName:match('^(%S+)') or steamName)
 
     MySQL.insert("INSERT INTO jgr_reports (citizenid, playerName, steamName, serverId, title, description, priority) VALUES (?, ?, ?, ?, ?, ?, ?)", {
         P:getIdentifier(),
@@ -217,7 +210,7 @@ JGR_Fw.CreateCallback('jgr_reports:server:createReport', function(source, cb, da
         if id then
             for _, v in ipairs(JGR_Fw.GetAllPlayerSources()) do
                 if JGR_Fw.IsStaff(v) then
-                    JGR_Fw.Notify(v, JGRReportsT('notify_new_report', firstShort, src), 'primary', 5000)
+                    JGR_Fw.Notify(v, JGRReportsT('notify_new_report', notifyShort, src), 'primary', 5000)
                 end
             end
             cb(id)
@@ -277,15 +270,11 @@ end)
 JGR_Fw.CreateCallback('jgr_reports:server:getActiveStaff', function(source, cb)
     local staffList = {}
     for _, v in ipairs(JGR_Fw.GetAllPlayerSources()) do
-        if JGR_Fw.IsStaff(v) then
-            local sp = JGR_Fw.GetPlayer(v)
-            if sp then
-                table.insert(staffList, {
-                    serverId = v,
-                    name = sp:getCharName(),
-                    steamName = GetSteamName(v)
-                })
-            end
+        if JGR_Fw.IsStaff(v) and JGR_Fw.GetPlayer(v) then
+            table.insert(staffList, {
+                serverId = v,
+                name = GetSteamName(v),
+            })
         end
     end
     cb(staffList)
@@ -296,7 +285,7 @@ RegisterNetEvent('jgr_reports:server:takeReport', function(reportId)
     local P = JGR_Fw.GetPlayer(src)
     if not P or not JGR_Fw.IsStaff(src) then return end
 
-    local adminName = P:getCharName()
+    local adminName = GetSteamName(src)
 
     reportId = tonumber(reportId)
     if not reportId then return end
@@ -323,14 +312,12 @@ RegisterNetEvent('jgr_reports:server:sendMessage', function(reportId, message, i
     local P = JGR_Fw.GetPlayer(src)
     if not P then return end
 
-    local charName = P:getCharName()
     local steamName = GetSteamName(src)
-    -- El sender guardado incluye nombre de personaje + steam name + ID
     local senderDisplay
     if isAdmin then
-        senderDisplay = "[Staff] " .. charName .. " (" .. steamName .. ") [ID:" .. src .. "]"
+        senderDisplay = "[Staff] " .. steamName .. " [ID:" .. src .. "]"
     else
-        senderDisplay = charName .. " (" .. steamName .. ") [ID:" .. src .. "]"
+        senderDisplay = steamName .. " [ID:" .. src .. "]"
     end
     
     MySQL.insert("INSERT INTO jgr_report_messages (report_id, sender, sender_id, message, is_admin) VALUES (?, ?, ?, ?, ?)", {
@@ -383,7 +370,7 @@ RegisterNetEvent('jgr_reports:server:closeReport', function(reportId)
         if not isAdmin and res[1].citizenid ~= P:getIdentifier() then return end
 
         local reason = isAdmin and CLOSE_REASON.STAFF or CLOSE_REASON.PLAYER
-        local name = GetCharacterFullName(P)
+        local name = GetSteamName(src)
         local cid = P:getIdentifier()
         local staffCloser = isAdmin and src or nil
 

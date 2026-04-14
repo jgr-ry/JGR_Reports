@@ -139,10 +139,13 @@ function renderActiveStaff(staffList) {
         staffList.forEach(staff => {
             const badge = document.createElement('div');
             badge.className = 'staff-badge';
+            const extra = staff.steamName
+                ? `<span class="staff-badge-steam">${escapeHtml(String(staff.steamName))}</span>`
+                : '';
             badge.innerHTML = `
                 <i class="fa-solid fa-shield-halved"></i>
-                <span class="staff-badge-name">${staff.name}</span>
-                <span class="staff-badge-steam">${staff.steamName}</span>
+                <span class="staff-badge-name">${escapeHtml(String(staff.name || ''))}</span>
+                ${extra}
             `;
             list.appendChild(badge);
         });
@@ -256,7 +259,7 @@ function timeAgo(date) {
 
 // ==========================================
 // HELPER: Parsear el sender string del servidor
-// Formato: "[Staff] Nombre (SteamName) [ID:X]" o "Nombre (SteamName) [ID:X]"
+// Formato actual: "[Staff] SteamName [ID:X]" / "SteamName [ID:X]" (legado: "... (Steam) [ID:X]")
 // ==========================================
 function parseSender(senderStr, isAdmin) {
     if (!senderStr) return { label: T('ui_unknown'), id: '', steam: '', isStaff: false };
@@ -347,10 +350,8 @@ function setupChatView(messagesData) {
             : T('ui_no_description');
         const desc = escapeHtml(rawDesc);
 
-        let meta = `<span class="chat-summary-meta-line"><i class="fa-solid fa-user"></i> ${escapeHtml(currentReport.playerName || '')}`;
-        if (currentReport.steamName) {
-            meta += ` <span class="chat-steam">(${escapeHtml(currentReport.steamName)})</span>`;
-        }
+        const reporterWho = currentReport.steamName || currentReport.playerName || '';
+        let meta = `<span class="chat-summary-meta-line"><i class="fa-solid fa-user"></i> ${escapeHtml(reporterWho)}`;
         const knowsPresence = currentReport.reporterOnline === true || currentReport.reporterOnline === false;
         const online = currentReport.reporterOnline === true;
         const liveId = currentReport.reporterServerId != null ? currentReport.reporterServerId : currentReport.serverId;
@@ -551,9 +552,8 @@ function renderActiveReports(filterText) {
 
         const online = rep.reporterOnline === true;
         const liveId = rep.reporterServerId != null ? rep.reporterServerId : rep.serverId;
-        let playerInfo = rep.playerName || T('ui_player_default');
+        let playerInfo = rep.steamName || rep.playerName || T('ui_player_default');
         let extraInfo = '';
-        if (rep.steamName) extraInfo += `<span class="card-steam">(${rep.steamName})</span> `;
         if (online && liveId) {
             extraInfo += `<span class="card-serverid">[ID:${liveId}]</span>`;
         }
@@ -628,7 +628,6 @@ function renderHistoryReports(filterText) {
         card.setAttribute('data-sound', 'hover');
 
         let extraInfo = '';
-        if (rep.steamName) extraInfo += `<span class="card-steam">(${rep.steamName})</span> `;
         if (rep.serverId) extraInfo += `<span class="card-serverid">[ID:${rep.serverId}]</span>`;
 
         let staffLine = '';
@@ -651,10 +650,12 @@ function renderHistoryReports(filterText) {
             closeLine = `<p class="history-close history-close-legacy">${escapeHtml(T('ui_history_legacy'))}</p>`;
         }
 
+        const histReporter = rep.steamName || rep.playerName || '';
+
         card.innerHTML = `
             <div class="report-info">
                 <h4>#${rep.id} - ${escapeHtml(String(rep.title || ''))}</h4>
-                <p><i class="fa-solid fa-user"></i> ${escapeHtml(String(rep.playerName || ''))} ${extraInfo} · <i class="fa-regular fa-clock"></i> ${new Date(rep.updated_at).toLocaleDateString()}${staffLine}</p>
+                <p><i class="fa-solid fa-user"></i> ${escapeHtml(String(histReporter))} ${extraInfo} · <i class="fa-regular fa-clock"></i> ${new Date(rep.updated_at).toLocaleDateString()}${staffLine}</p>
                 ${closeLine}
             </div>
             <button class="btn-take ui-sound" data-sound="click">${escapeHtml(T('ui_review'))}</button>
