@@ -4,8 +4,45 @@ local CLOSE_REASON = {
     INACTIVITY = 'inactivity',
 }
 
+--- Nombre de cliente (suele ser Steam/FiveM). Muchos servidores lo igualan al nombre RP: en ese caso usamos identificadores.
+local function GetIdentifierDisplayName(src)
+    for _, id in ipairs(GetPlayerIdentifiers(src)) do
+        if id:sub(1, 6) == 'steam:' then
+            return id:sub(7)
+        end
+    end
+    for _, id in ipairs(GetPlayerIdentifiers(src)) do
+        if id:sub(1, 6) == 'fivem:' then
+            return id:sub(7)
+        end
+    end
+    for _, id in ipairs(GetPlayerIdentifiers(src)) do
+        if id:sub(1, 8) == 'license:' then
+            return id:sub(-8)
+        end
+    end
+    return nil
+end
+
+local function NamesMatchRp(a, b)
+    if not a or not b or a == '' or b == '' then return false end
+    return a:gsub('%s+', ' '):lower():gsub('^%s*(.-)%s*$', '%1')
+        == b:gsub('%s+', ' '):lower():gsub('^%s*(.-)%s*$', '%1')
+end
+
 local function GetSteamName(src)
-    return GetPlayerName(src) or JGRReportsT('ui_unknown')
+    local pname = GetPlayerName(src)
+    if not pname or pname == '' then
+        return GetIdentifierDisplayName(src) or JGRReportsT('ui_unknown')
+    end
+    local P = JGR_Fw.GetPlayer(src)
+    if P then
+        local charName = P:getCharName()
+        if charName and charName ~= '' and NamesMatchRp(pname, charName) then
+            return GetIdentifierDisplayName(src) or pname
+        end
+    end
+    return pname
 end
 
 local function NotifyAdminsReportStale()
