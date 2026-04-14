@@ -193,10 +193,14 @@ JGR_Fw.CreateCallback('jgr_reports:server:createReport', function(source, cb, da
     local src = source
     local P = JGR_Fw.GetPlayer(src)
     if not P then return cb(false) end
+    if type(data) ~= 'table' then return cb(false) end
 
-    local title = data.title
-    local description = data.description
-    local priority = data.priority
+    local title = tostring(data.title or ''):sub(1, 120)
+    local description = tostring(data.description or ''):sub(1, 2000)
+    local priority = tostring(data.priority or 'media')
+    if title:gsub('%s+', '') == '' or description:gsub('%s+', '') == '' then
+        return cb(false)
+    end
     local steamName = GetSteamName(src)
     local charName = P:getCharName()
     local firstShort = (charName:match('^(%S+)') or charName)
@@ -245,8 +249,28 @@ JGR_Fw.CreateCallback('jgr_reports:server:getReportHistory', function(source, cb
 end)
 
 JGR_Fw.CreateCallback('jgr_reports:server:getMessages', function(source, cb, reportId)
-    MySQL.query("SELECT * FROM jgr_report_messages WHERE report_id = ? ORDER BY created_at ASC", {reportId}, function(result)
-        cb(result)
+    reportId = tonumber(reportId)
+    if not reportId then return cb({}) end
+    local P = JGR_Fw.GetPlayer(source)
+    if not P then return cb({}) end
+    local isStaff = JGR_Fw.IsStaff(source)
+    local citizenid = P:getIdentifier()
+
+    if isStaff then
+        MySQL.query("SELECT * FROM jgr_report_messages WHERE report_id = ? ORDER BY created_at ASC", {reportId}, function(result)
+            cb(result or {})
+        end)
+        return
+    end
+
+    MySQL.query("SELECT id FROM jgr_reports WHERE id = ? AND citizenid = ? LIMIT 1", { reportId, citizenid }, function(ownerRows)
+        if not ownerRows or not ownerRows[1] then
+            cb({})
+            return
+        end
+        MySQL.query("SELECT * FROM jgr_report_messages WHERE report_id = ? ORDER BY created_at ASC", {reportId}, function(result)
+            cb(result or {})
+        end)
     end)
 end)
 
@@ -274,6 +298,8 @@ RegisterNetEvent('jgr_reports:server:takeReport', function(reportId)
 
     local adminName = P:getCharName()
 
+    reportId = tonumber(reportId)
+    if not reportId then return end
     MySQL.update("UPDATE jgr_reports SET status = 'En progreso', adminCitizenid = ?, adminName = ? WHERE id = ?", { P:getIdentifier(), adminName, reportId }, function(affectedRows)
         if affectedRows > 0 then
             MySQL.query('SELECT citizenid FROM jgr_reports WHERE id = ?', { reportId }, function(res)
@@ -289,6 +315,10 @@ RegisterNetEvent('jgr_reports:server:takeReport', function(reportId)
 end)
 
 RegisterNetEvent('jgr_reports:server:sendMessage', function(reportId, message, isAdmin)
+    reportId = tonumber(reportId)
+    message = tostring(message or ''):sub(1, 1500)
+    if not reportId or message:gsub('%s+', '') == '' then return end
+
     local src = source
     local P = JGR_Fw.GetPlayer(src)
     if not P then return end
@@ -339,6 +369,9 @@ RegisterNetEvent('jgr_reports:server:sendMessage', function(reportId, message, i
 end)
 
 RegisterNetEvent('jgr_reports:server:closeReport', function(reportId)
+    reportId = tonumber(reportId)
+    if not reportId then return end
+
     local src = source
     local P = JGR_Fw.GetPlayer(src)
     if not P then return end
@@ -367,6 +400,8 @@ local activeCallChannels = {} -- { reportId = channel }
 RegisterNetEvent('jgr_reports:server:callPlayer', function(reportId)
     local src = source
     if not JGR_Fw.IsStaff(src) then return end
+    reportId = tonumber(reportId)
+    if not reportId then return end
 
     MySQL.query("SELECT citizenid FROM jgr_reports WHERE id = ?", { reportId }, function(res)
         if res[1] and res[1].citizenid then
@@ -384,6 +419,8 @@ end)
 
 RegisterNetEvent('jgr_reports:server:answerCall', function(adminSrc, reportId)
     local src = source
+    adminSrc = tonumber(adminSrc)
+    reportId = tonumber(reportId)
     if not adminSrc or not reportId then return end
 
     local P = JGR_Fw.GetPlayer(src)
@@ -402,12 +439,15 @@ end)
 
 RegisterNetEvent('jgr_reports:server:declineCall', function(adminSrc)
     local src = source
+    adminSrc = tonumber(adminSrc)
+    if not adminSrc then return end
     -- Notificar al admin
     TriggerClientEvent('jgr_reports:client:callDeclined', adminSrc)
 end)
 
 RegisterNetEvent('jgr_reports:server:hangUp', function(reportId)
     local src = source
+    reportId = tonumber(reportId)
     if not reportId then return end
     
     MySQL.query("SELECT citizenid, adminCitizenid FROM jgr_reports WHERE id = ?", {reportId}, function(res)
