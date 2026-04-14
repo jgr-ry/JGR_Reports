@@ -3,7 +3,7 @@ game 'gta5'
 
 author 'JGR Studio'
 description 'Sistema de reportes multi-framework (QB / Qbox / ESX / Standalone)'
-version '1.0.0.0'
+version '1.0.0'
 
 shared_scripts {
     'locales/en.lua',
@@ -19,6 +19,7 @@ client_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
+    'server/version_check.lua',
     'bridge/sv_bridge.lua',
     'server/server.lua',
 }
