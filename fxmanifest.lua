@@ -18,8 +18,8 @@ client_scripts {
 }
 
 server_scripts {
-    '@oxmysql/lib/MySQL.lua',
     'server/version_check.lua',
+    '@oxmysql/lib/MySQL.lua',
     'bridge/sv_bridge.lua',
     'server/server.lua',
 }

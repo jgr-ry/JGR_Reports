@@ -2,6 +2,12 @@
     Server bridge: qb-core, qbx_core (Qbox), es_extended, standalone.
 ]]
 
+if GetCurrentResourceName() ~= 'JGR_Reports' then
+    print(('^1[JGR]^0 Renombra la carpeta del recurso a ^3JGR_Reports^0 (actual: ^1%s^0).'):format(GetCurrentResourceName()))
+    StopResource(GetCurrentResourceName())
+    return
+end
+
 JGR_Fw = JGR_Fw or {}
 JGR_Fw._serverCallbacks = {}
 

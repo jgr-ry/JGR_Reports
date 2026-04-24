@@ -1,3 +1,9 @@
+if GetCurrentResourceName() ~= 'JGR_Reports' then
+    print(('^1[JGR]^0 Renombra la carpeta del recurso a ^3JGR_Reports^0 (actual: ^1%s^0).'):format(GetCurrentResourceName()))
+    StopResource(GetCurrentResourceName())
+    return
+end
+
 local CLOSE_REASON = {
     STAFF = 'staff',
     PLAYER = 'player',
