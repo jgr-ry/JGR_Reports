@@ -18,7 +18,7 @@ client_scripts {
 }
 
 server_scripts {
-    'server/version_check.lua',
+    'server/init.lua',
     '@oxmysql/lib/MySQL.lua',
     'bridge/sv_bridge.lua',
     'server/server.lua',
