@@ -418,21 +418,21 @@ function appendMessage(senderStr, text, is_admin, timestamp) {
     if (!isMe) {
         if (is_admin) {
             // Mostrar quién del staff está hablando
-            innerContent += `<span class="msg-sender staff-sender"><i class="fa-solid fa-shield-halved"></i> ${parsed.label}`;
-            if (parsed.steam) innerContent += ` <span class="msg-sender-steam">(${parsed.steam})</span>`;
-            if (parsed.id) innerContent += ` <span class="msg-sender-id">[ID:${parsed.id}]</span>`;
+            innerContent += `<span class="msg-sender staff-sender"><i class="fa-solid fa-shield-halved"></i> ${escapeHtml(parsed.label)}`;
+            if (parsed.steam) innerContent += ` <span class="msg-sender-steam">(${escapeHtml(parsed.steam)})</span>`;
+            if (parsed.id) innerContent += ` <span class="msg-sender-id">[ID:${escapeHtml(parsed.id)}]</span>`;
             innerContent += `</span>`;
         } else {
             // Jugador hablando (admin viendo)
-            innerContent += `<span class="msg-sender"><i class="fa-solid fa-user"></i> ${parsed.label}`;
-            if (parsed.steam) innerContent += ` <span class="msg-sender-steam">(${parsed.steam})</span>`;
-            if (parsed.id) innerContent += ` <span class="msg-sender-id">[ID:${parsed.id}]</span>`;
+            innerContent += `<span class="msg-sender"><i class="fa-solid fa-user"></i> ${escapeHtml(parsed.label)}`;
+            if (parsed.steam) innerContent += ` <span class="msg-sender-steam">(${escapeHtml(parsed.steam)})</span>`;
+            if (parsed.id) innerContent += ` <span class="msg-sender-id">[ID:${escapeHtml(parsed.id)}]</span>`;
             innerContent += `</span>`;
         }
     } else if (is_admin && isAdminContext) {
         // Soy yo (admin) el que habla - mostrar mi propio nombre
-        innerContent += `<span class="msg-sender self-sender"><i class="fa-solid fa-shield-halved"></i> ${parsed.label}`;
-        if (parsed.id) innerContent += ` <span class="msg-sender-id">[ID:${parsed.id}]</span>`;
+        innerContent += `<span class="msg-sender self-sender"><i class="fa-solid fa-shield-halved"></i> ${escapeHtml(parsed.label)}`;
+        if (parsed.id) innerContent += ` <span class="msg-sender-id">[ID:${escapeHtml(parsed.id)}]</span>`;
         innerContent += `</span>`;
     }
 

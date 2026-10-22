@@ -1,5 +1,5 @@
 --[[
-    Client bridge: qb-core, qbx_core, es_extended, standalone.
+    Client bridge: qb-core, qbx_core (Qbox), es_extended, standalone / ox_core.
 ]]
 
 JGR_FW = JGR_FW or {}
@@ -10,68 +10,34 @@ local QBCore = nil
 local ESX = nil
 
 local function fw()
-    local f = (Config.Framework or 'qb'):lower()
-    if f == 'qbx' then return 'qbox' end
-    return f
-end
-
-local function isQB()
-    local f = fw()
-    return f == 'qb' or f == 'qbox'
-end
-
-local function qbCoreExportName()
-    local f = fw()
-    if f == 'qb' then return 'qb-core' end
-    if f == 'qbox' then return 'qbx_core' end
-    return nil
-end
-
-local ESX_EXPORT = 'es_extended'
-
-function JGR_FW.Init()
-    if isQB() then
-        local res = qbCoreExportName()
-        if res then
-            local ok, core = pcall(function()
-                return exports[res]:GetCoreObject()
-            end)
-            QBCore = ok and core or nil
-        end
-    elseif fw() == 'esx' then
-        local ok, obj = pcall(function()
-            return exports[ESX_EXPORT]:getSharedObject()
-        end)
-        if ok and obj then
-            ESX = obj
-        end
-    end
+    return JGRReportsBridge.Current()
 end
 
 CreateThread(function()
-    JGR_FW.Init()
-    if fw() == 'esx' and not ESX then
-        local t = 0
-        while not ESX and t < 150 do
-            local ok, obj = pcall(function()
-                return exports[ESX_EXPORT]:getSharedObject()
-            end)
-            if ok and obj then
-                ESX = obj
-                break
-            end
-            Wait(100)
-            t = t + 1
-        end
+    local f = JGRReportsBridge.Resolve()
+    if f == 'qb' then
+        local ok, core = pcall(function()
+            return exports['qb-core']:GetCoreObject()
+        end)
+        QBCore = ok and core or nil
+    elseif f == 'esx' then
+        local ok, obj = pcall(function()
+            return exports['es_extended']:getSharedObject()
+        end)
+        ESX = ok and obj or nil
     end
+    -- Qbox: exports.qbx_core:* directamente (exports.qbx_core:GetCoreObject() NO existe).
 end)
 
 function JGR_FW.Notify(msg, nType, duration)
     nType = nType or 'primary'
     duration = duration or 5000
-    if isQB() and QBCore then
+    local f = fw()
+    if f == 'qb' and QBCore then
         QBCore.Functions.Notify(msg, nType, duration)
-    elseif fw() == 'esx' and ESX then
+    elseif f == 'qbox' then
+        exports.qbx_core:Notify(msg, nType == 'primary' and 'inform' or nType, duration)
+    elseif f == 'esx' and ESX then
         if ESX.ShowNotification then
             ESX.ShowNotification(msg)
         else
@@ -79,7 +45,7 @@ function JGR_FW.Notify(msg, nType, duration)
         end
     else
         BeginTextCommandThefeedPost('STRING')
-        AddTextComponentSubstringPlayerName(msg)
+        AddTextComponentSubstringPlayerName(tostring(msg))
         EndTextCommandThefeedPostTicker(false, true)
     end
 end
@@ -88,10 +54,13 @@ RegisterNetEvent('jgr_reports:client:notify', function(msg, nType, duration)
     JGR_FW.Notify(msg, nType, duration)
 end)
 
+--- QBCore y ESX usan sus callbacks; Qbox y standalone (o si el framework aún no ha cargado) usan
+--- el sistema interno por eventos, que el servidor atiende siempre.
 function JGR_FW.TriggerCallback(name, cb, ...)
-    if isQB() and QBCore then
+    local f = fw()
+    if f == 'qb' and QBCore then
         QBCore.Functions.TriggerCallback(name, cb, ...)
-    elseif fw() == 'esx' and ESX then
+    elseif f == 'esx' and ESX then
         ESX.TriggerServerCallback(name, cb, ...)
     else
         JGR_FW._req = JGR_FW._req + 1

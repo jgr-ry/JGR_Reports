@@ -10,6 +10,22 @@ local CLOSE_REASON = {
     INACTIVITY = 'inactivity',
 }
 
+--- Prioridades válidas (las que envía la NUI). Cualquier otro valor se guarda como 'Baja'.
+local VALID_PRIORITY = { baja = 'Baja', media = 'Media', alta = 'Alta' }
+
+local CREATE_COOLDOWN_MS = 30000
+local MESSAGE_COOLDOWN_MS = 500
+local lastCreateAt = {}
+local lastMessageAt = {}
+
+--- true si el jugador ha hecho esa acción hace menos de `ms` (y si no, la registra).
+local function IsThrottled(store, src, ms)
+    local now = GetGameTimer()
+    if store[src] and (now - store[src]) < ms then return true end
+    store[src] = now
+    return false
+end
+
 --- Nombre de cliente (suele ser Steam/FiveM). Muchos servidores lo igualan al nombre RP: en ese caso usamos identificadores.
 local function GetIdentifierDisplayName(src)
     for _, id in ipairs(GetPlayerIdentifiers(src)) do
@@ -233,8 +249,19 @@ JGR_Fw.CreateCallback('jgr_reports:server:createReport', function(source, cb, da
 
     local title = tostring(data.title or ''):sub(1, 120)
     local description = tostring(data.description or ''):sub(1, 2000)
-    local priority = tostring(data.priority or 'media')
+    local priority = VALID_PRIORITY[tostring(data.priority or ''):lower()] or 'Baja'
     if title:gsub('%s+', '') == '' or description:gsub('%s+', '') == '' then
+        return cb(false)
+    end
+    if IsThrottled(lastCreateAt, src, CREATE_COOLDOWN_MS) then
+        return cb(false)
+    end
+    -- Un solo reporte activo por jugador (antes solo lo comprobaba el comando, no el callback).
+    local active = MySQL.scalar.await(
+        "SELECT id FROM jgr_reports WHERE citizenid = ? AND status IN ('Abierto', 'En progreso') LIMIT 1",
+        { P:getIdentifier() }
+    )
+    if active then
         return cb(false)
     end
     local steamName = GetSteamName(src)
@@ -332,8 +359,9 @@ RegisterNetEvent('jgr_reports:server:takeReport', function(reportId)
 
     reportId = tonumber(reportId)
     if not reportId then return end
-    MySQL.update("UPDATE jgr_reports SET status = 'En progreso', adminCitizenid = ?, adminName = ? WHERE id = ?", { P:getIdentifier(), adminName, reportId }, function(affectedRows)
-        if affectedRows > 0 then
+    -- Solo reportes activos (antes un reporte cerrado volvía a 'En progreso').
+    MySQL.update("UPDATE jgr_reports SET status = 'En progreso', adminCitizenid = ?, adminName = ? WHERE id = ? AND status IN ('Abierto', 'En progreso')", { P:getIdentifier(), adminName, reportId }, function(affectedRows)
+        if affectedRows and affectedRows > 0 then
             MySQL.query('SELECT citizenid FROM jgr_reports WHERE id = ?', { reportId }, function(res)
                 if not res[1] or not res[1].citizenid then return end
                 local targetPlayer = JGR_Fw.GetPlayerByIdentifier(res[1].citizenid)
@@ -354,6 +382,18 @@ RegisterNetEvent('jgr_reports:server:sendMessage', function(reportId, message, i
     local src = source
     local P = JGR_Fw.GetPlayer(src)
     if not P then return end
+    if IsThrottled(lastMessageAt, src, MESSAGE_COOLDOWN_MS) then return end
+
+    -- Seguridad: el flag de staff lo decide el servidor (antes cualquier jugador podía escribir como [Staff])
+    -- y un jugador solo puede escribir en su propio reporte activo.
+    local isStaff = JGR_Fw.IsStaff(src)
+    isAdmin = (isAdmin == true or isAdmin == 1) and isStaff
+    local report = MySQL.single.await(
+        "SELECT citizenid FROM jgr_reports WHERE id = ? AND status IN ('Abierto', 'En progreso') LIMIT 1",
+        { reportId }
+    )
+    if not report then return end
+    if not isStaff and report.citizenid ~= P:getIdentifier() then return end
 
     local steamName = GetSteamName(src)
     local senderDisplay
@@ -425,7 +465,13 @@ end)
 -- SISTEMA DE LLAMADAS (VOZ CON CANALES DINÁMICOS)
 -- ==========================================
 
-local activeCallChannels = {} -- { reportId = channel }
+local activeCallChannels = {} -- { [reportId] = { channel, admin, player } }
+local pendingCalls = {}       -- { [reportId] = { admin, player } } llamadas sin contestar
+
+local function CallChannel()
+    local base = tonumber(Config.VoiceChannelBase) or 8000
+    return base + math.random(0, 1999)
+end
 
 RegisterNetEvent('jgr_reports:server:callPlayer', function(reportId)
     local src = source
@@ -433,10 +479,11 @@ RegisterNetEvent('jgr_reports:server:callPlayer', function(reportId)
     reportId = tonumber(reportId)
     if not reportId then return end
 
-    MySQL.query("SELECT citizenid FROM jgr_reports WHERE id = ?", { reportId }, function(res)
+    MySQL.query("SELECT citizenid FROM jgr_reports WHERE id = ? AND status IN ('Abierto', 'En progreso')", { reportId }, function(res)
         if res[1] and res[1].citizenid then
             local targetPlayer = JGR_Fw.GetPlayerByIdentifier(res[1].citizenid)
             if targetPlayer then
+                pendingCalls[reportId] = { admin = src, player = targetPlayer:getSource() }
                 TriggerClientEvent('jgr_reports:client:receiveCall', targetPlayer:getSource(), src, reportId)
             else
                 JGR_Fw.Notify(src, JGRReportsT('notify_player_offline'), 'error')
@@ -456,11 +503,17 @@ RegisterNetEvent('jgr_reports:server:answerCall', function(adminSrc, reportId)
     local P = JGR_Fw.GetPlayer(src)
     if not P then return end
 
+    -- Seguridad: solo se puede contestar una llamada real de ese staff (antes adminSrc venía del cliente
+    -- sin comprobar y se podía meter a cualquier jugador en un canal de voz).
+    local pending = pendingCalls[reportId]
+    if not pending or pending.admin ~= adminSrc or pending.player ~= src then return end
+
     MySQL.query('SELECT citizenid FROM jgr_reports WHERE id = ?', { reportId }, function(res)
         if not res[1] or res[1].citizenid ~= P:getIdentifier() then return end
 
-        local channel = math.random(8000, 9999)
-        activeCallChannels[reportId] = channel
+        pendingCalls[reportId] = nil
+        local channel = CallChannel()
+        activeCallChannels[reportId] = { channel = channel, admin = adminSrc, player = src }
 
         TriggerClientEvent('jgr_reports:client:callAnswered', adminSrc, channel)
         TriggerClientEvent('jgr_reports:client:callAnswered', src, channel)
@@ -471,8 +524,14 @@ RegisterNetEvent('jgr_reports:server:declineCall', function(adminSrc)
     local src = source
     adminSrc = tonumber(adminSrc)
     if not adminSrc then return end
-    -- Notificar al admin
-    TriggerClientEvent('jgr_reports:client:callDeclined', adminSrc)
+    for reportId, pending in pairs(pendingCalls) do
+        if pending.player == src and pending.admin == adminSrc then
+            pendingCalls[reportId] = nil
+            -- Notificar al admin
+            TriggerClientEvent('jgr_reports:client:callDeclined', adminSrc)
+            return
+        end
+    end
 end)
 
 RegisterNetEvent('jgr_reports:server:hangUp', function(reportId)
@@ -480,8 +539,23 @@ RegisterNetEvent('jgr_reports:server:hangUp', function(reportId)
     reportId = tonumber(reportId)
     if not reportId then return end
     
+    local P = JGR_Fw.GetPlayer(src)
+    if not P then return end
+    local isStaff = JGR_Fw.IsStaff(src)
+
     MySQL.query("SELECT citizenid, adminCitizenid FROM jgr_reports WHERE id = ?", {reportId}, function(res)
         if res[1] then
+            -- Solo el staff o el dueño del reporte pueden colgar.
+            if not isStaff and res[1].citizenid ~= P:getIdentifier() then return end
+
+            -- Participantes reales de la llamada (el staff que llamó puede no ser el asignado).
+            local call = activeCallChannels[reportId]
+            if call then
+                TriggerClientEvent('jgr_reports:client:callEnded', call.admin)
+                TriggerClientEvent('jgr_reports:client:callEnded', call.player)
+            end
+            pendingCalls[reportId] = nil
+
             -- Manda evento de Colgar al creador del reporte
             local targetPlayer = JGR_Fw.GetPlayerByIdentifier(res[1].citizenid)
             if targetPlayer then
@@ -504,4 +578,20 @@ RegisterNetEvent('jgr_reports:server:hangUp', function(reportId)
             end
         end
     end)
+end)
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    lastCreateAt[src] = nil
+    lastMessageAt[src] = nil
+    for reportId, pending in pairs(pendingCalls) do
+        if pending.admin == src or pending.player == src then pendingCalls[reportId] = nil end
+    end
+    for reportId, call in pairs(activeCallChannels) do
+        if call.admin == src or call.player == src then
+            local other = call.admin == src and call.player or call.admin
+            TriggerClientEvent('jgr_reports:client:callEnded', other)
+            activeCallChannels[reportId] = nil
+        end
+    end
 end)

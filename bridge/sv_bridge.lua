@@ -1,5 +1,6 @@
 --[[
-    Server bridge: qb-core, qbx_core (Qbox), es_extended, standalone.
+    Server bridge: qb-core, qbx_core (Qbox), es_extended, standalone / ox_core.
+    El resto del servidor solo usa JGR_Fw.*; nunca llama a un framework directamente.
 ]]
 
 if GetCurrentResourceName() ~= 'JGR_Reports' then
@@ -15,22 +16,16 @@ local QBCore = nil
 local ESX = nil
 
 local function fw()
-    local f = (Config.Framework or 'qb'):lower()
-    if f == 'qbx' then return 'qbox' end
-    return f
+    return JGRReportsBridge.Current()
 end
 
+--- QBCore clásico con objeto cargado.
 local function isQB()
-    local f = fw()
-    return f == 'qb' or f == 'qbox'
+    return fw() == 'qb' and QBCore ~= nil
 end
 
---- Recurso de export según Config.Framework (sin entradas extra en config).
-local function qbCoreExportName()
-    local f = fw()
-    if f == 'qb' then return 'qb-core' end
-    if f == 'qbox' then return 'qbx_core' end
-    return nil
+local function isQbox()
+    return fw() == 'qbox'
 end
 
 local ESX_EXPORT = 'es_extended'
@@ -44,10 +39,9 @@ local function tableHas(t, val)
 end
 
 function JGR_Fw.LicenseIdentifier(src)
-    for _, id in ipairs(GetPlayerIdentifiers(src)) do
-        if id:sub(1, 8) == 'license:' then return id end
-    end
-    return 'license:temp_' .. tostring(src)
+    return GetPlayerIdentifierByType(src, 'license')
+        or GetPlayerIdentifierByType(src, 'license2')
+        or ('license:temp_' .. tostring(src))
 end
 
 local function wrapQBPlayer(p)
@@ -112,17 +106,17 @@ local function wrapStandalonePlayer(src)
 end
 
 function JGR_Fw.Init()
-    if isQB() then
-        local res = qbCoreExportName()
-        if not res then return end
+    local f = JGRReportsBridge.Resolve()
+    print(('^2[JGR_Reports]^7 Framework: ^5%s^7'):format(f))
+    if f == 'qb' then
         local ok, core = pcall(function()
-            return exports[res]:GetCoreObject()
+            return exports['qb-core']:GetCoreObject()
         end)
         QBCore = ok and core or nil
         if not QBCore then
-            print('^1[JGR_Reports] ^0No se pudo cargar ' .. res .. ' (Framework=' .. tostring(Config.Framework) .. ')^0')
+            print('^1[JGR_Reports] ^0No se pudo cargar qb-core (Framework=' .. tostring(Config.Framework) .. ')^0')
         end
-    elseif fw() == 'esx' then
+    elseif f == 'esx' then
         local ok, obj = pcall(function()
             return exports[ESX_EXPORT]:getSharedObject()
         end)
@@ -154,7 +148,11 @@ function JGR_Fw.WaitForESX()
 end
 
 function JGR_Fw.GetPlayer(src)
-    if isQB() and QBCore then
+    src = tonumber(src)
+    if not src then return nil end
+    if isQbox() then
+        return wrapQBPlayer(exports.qbx_core:GetPlayer(src))
+    elseif isQB() then
         return wrapQBPlayer(QBCore.Functions.GetPlayer(src))
     elseif fw() == 'esx' and ESX then
         return wrapESXPlayer(ESX.GetPlayerFromId(src))
@@ -166,7 +164,9 @@ end
 
 function JGR_Fw.GetPlayerByIdentifier(identifier)
     if not identifier then return nil end
-    if isQB() and QBCore then
+    if isQbox() then
+        return wrapQBPlayer(exports.qbx_core:GetPlayerByCitizenId(identifier))
+    elseif isQB() then
         return wrapQBPlayer(QBCore.Functions.GetPlayerByCitizenId(identifier))
     elseif fw() == 'esx' and ESX then
         local xP = nil
@@ -202,7 +202,15 @@ end
 
 function JGR_Fw.IsStaff(src)
     local groups = Config.AdminGroups or {}
-    if isQB() and QBCore then
+    if isQbox() then
+        -- Qbox: permisos por ACE (group.<nombre>) o exports.qbx_core:HasPermission
+        for _, g in ipairs(groups) do
+            if IsPlayerAceAllowed(src, 'group.' .. g) then return true end
+            local ok, allowed = pcall(function() return exports.qbx_core:HasPermission(src, g) end)
+            if ok and allowed then return true end
+        end
+        return false
+    elseif isQB() then
         return QBCore.Functions.HasPermission(src, groups)
     elseif fw() == 'esx' and ESX then
         local xP = ESX.GetPlayerFromId(src)
@@ -231,7 +239,9 @@ end
 function JGR_Fw.Notify(src, msg, nType, duration)
     nType = nType or 'primary'
     duration = duration or 5000
-    if isQB() and QBCore then
+    if isQbox() then
+        exports.qbx_core:Notify(src, msg, nType == 'primary' and 'inform' or nType, duration)
+    elseif isQB() then
         TriggerClientEvent('QBCore:Notify', src, msg, nType, duration)
     elseif fw() == 'esx' then
         TriggerClientEvent('esx:showNotification', src, msg)
@@ -244,8 +254,9 @@ function JGR_Fw.CreateCallback(name, fn)
     JGR_Fw._serverCallbacks[name] = fn
 end
 
+--- Qbox y standalone usan solo el sistema interno (jgr_reports:internal:cb), que siempre está activo.
 function JGR_Fw.RegisterAllCallbacks()
-    if isQB() and QBCore then
+    if isQB() then
         for name, fn in pairs(JGR_Fw._serverCallbacks) do
             QBCore.Functions.CreateCallback(name, fn)
         end
@@ -260,8 +271,8 @@ end
 
 RegisterNetEvent('jgr_reports:internal:cb', function(name, reqId, ...)
     local src = source
-    local fn = JGR_Fw._serverCallbacks[name]
-    if not fn then return end
+    local fn = type(name) == 'string' and JGR_Fw._serverCallbacks[name]
+    if not fn or type(reqId) ~= 'number' then return end
     fn(src, function(...)
         TriggerClientEvent('jgr_reports:internal:cb_res', src, reqId, ...)
     end, ...)
@@ -272,7 +283,7 @@ function JGR_Fw.RegisterCommands()
         local P = JGR_Fw.GetPlayer(src)
         if not P then return end
         MySQL.query('SELECT * FROM jgr_reports WHERE citizenid = ? AND status IN (\'Abierto\', \'En progreso\') LIMIT 1', { P:getIdentifier() }, function(result)
-            if result[1] then
+            if result and result[1] then
                 -- El jugador no debe recibir nombre de personaje ni Steam en el NUI (solo staff lo ve en panel)
                 local row = result[1]
                 row.playerName = nil
@@ -292,7 +303,7 @@ function JGR_Fw.RegisterCommands()
         TriggerClientEvent('jgr_reports:client:openAdminPanel', src)
     end
 
-    if isQB() and QBCore then
+    if isQB() then
         QBCore.Commands.Add(Config.CommandPlayer, JGRReportsT('cmd_report_desc'), {}, false, function(source, _)
             openReport(source)
         end)

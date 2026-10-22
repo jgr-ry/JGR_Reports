@@ -1,168 +1,138 @@
 # JGR Reports
 
-Sistema de **reportes y soporte in-game** para **FiveM**, con interfaz NUI, chat en vivo, historial y soporte **multi-framework** (QBCore, Qbox, ESX y modo standalone).
+Sistema de **reportes y soporte in-game** para FiveM: los jugadores abren un reporte, el staff lo atiende desde un panel con chat en vivo, historial y llamadas de voz opcionales.
 
-**Versión:** `1.0.0.0`  
-**Autor:** JGR Studio  
+`Versión 1.1.0` · `QBCore · Qbox · ESX · Standalone (ox_core)` · `oxmysql`
 
 ---
 
 ## Características
 
-- **Jugadores:** comando para crear reportes (título, descripción, prioridad) y ver staff en línea.
-- **Staff:** panel con reportes activos, historial, búsqueda y chat por reporte.
-- **Chat** en tiempo real entre jugador y staff (y visibilidad para otros staff en el mismo hilo).
-- **Llamadas de voz** opcionales con **pma-voice** (canal de llamada temporal).
-- **Historial** de reportes cerrados con motivo de cierre (staff, usuario, inactividad).
-- **Cierre automático** si el reportante lleva **desconectado** más tiempo del configurado.
-- **Estado en línea** del reportante en el panel de staff.
-- **Idiomas:** español e inglés (`locales/es.lua`, `locales/en.lua`).
-- **Base de datos:** importación automática de tablas si no existen (MySQL / oxmysql).
-
----
+- **Jugadores**: `/report` abre un formulario (título, descripción, prioridad Baja/Media/Alta) con el staff conectado; si ya tienes un reporte activo, abre su chat.
+- **Staff**: `/reportes` abre el panel con reportes activos (con estado en línea del jugador), historial de los 50 últimos cerrados y búsqueda.
+- **Chat en tiempo real** entre jugador y staff; el resto del staff conectado también ve los mensajes.
+- **Asignación**: al abrir un reporte, el staff lo toma (`En progreso`) y el jugador recibe un aviso.
+- **Llamadas de voz** opcionales con **pma-voice** (canal de llamada temporal; sin pma-voice no falla).
+- **Cierre** por staff, por el propio jugador o **automático** si el jugador lleva desconectado más de `Config.AutoCloseOfflineMinutes`.
+- **Historial** con motivo de cierre (staff, usuario, inactividad) y quién lo cerró.
+- **Base de datos**: crea las tablas automáticamente la primera vez y añade columnas nuevas al actualizar.
+- **Idiomas**: español e inglés.
 
 ## Requisitos
 
-| Dependencia | Uso |
-|-------------|-----|
-| **[oxmysql](https://github.com/overextended/oxmysql)** | Obligatorio |
-| **qb-core** / **qbx_core** / **es_extended** | Según `Config.Framework` |
-| **pma-voice** | Opcional (llamadas) |
-
-- **FXServer** con artefactos recientes (recomendado `cerulean`).
-
----
+| Recurso | ¿Obligatorio? | Uso |
+|---|---|---|
+| [oxmysql](https://github.com/overextended/oxmysql) | **Sí** | Base de datos |
+| `qbx_core` / `qb-core` / `es_extended` / `ox_core` | No | Se detecta solo; sin framework funciona en modo standalone |
+| `pma-voice` | No | Llamadas de voz staff ↔ jugador |
 
 ## Instalación
 
-1. Copia la carpeta del recurso en tu directorio `resources` (por ejemplo `[JGR]/JGR_Reports`).
-2. Asegúrate de tener **oxmysql** iniciado **antes** que este recurso.
-3. Añade en `server.cfg`:
-
+1. Copia la carpeta con el nombre **exacto** `JGR_Reports` (si se renombra, el recurso se detiene).
+2. Base de datos: las tablas `jgr_reports` y `jgr_report_messages` se crean solas al primer arranque. Si lo prefieres, importa `install.sql` a mano.
+3. Añade al `server.cfg`, **después** de oxmysql y del framework:
    ```cfg
    ensure oxmysql
+   ensure qb-core        # o qbx_core / es_extended / ox_core (opcional)
+   ensure pma-voice      # opcional
    ensure JGR_Reports
    ```
+4. Revisa `config.lua` (sobre todo `Config.AdminGroups` para tu staff).
 
-4. **Base de datos:** la primera ejecución puede crear las tablas automáticamente. También puedes importar manualmente `install.sql` en tu base de datos.
-5. Edita **`config.lua`** (al menos `Config.Framework` y, si aplica, grupos de staff).
-6. Reinicia el servidor o `ensure JGR_Reports`.
+## Configuración
 
----
+| Opción | Por defecto | Descripción |
+|---|---|---|
+| `Config.Framework` | `'auto'` | `'auto'`, `'qb'`, `'qbox'` (o `'qbx'`), `'esx'` o `'standalone'`. En `auto` detecta `qbx_core` → `qb-core` → `es_extended` → `ox_core` → standalone |
+| `Config.Locale` | `'es'` | `'es'` o `'en'` |
+| `Config.CommandPlayer` | `'report'` | Comando de jugadores |
+| `Config.CommandAdmin` | `'reportes'` | Comando del panel de staff |
+| `Config.AdminGroups` | `{ 'mod', 'admin', 'god' }` | Grupos de staff (ver tabla de compatibilidad) |
+| `Config.StandaloneAce` | `'jgr_reports.admin'` | ACE de staff en standalone / ox_core |
+| `Config.StandaloneAdminLicenses` | `{}` | Lista de `license:...` con acceso de staff en standalone |
+| `Config.AutoCloseOfflineMinutes` | `10` | Minutos desconectado antes de cerrar el reporte |
+| `Config.StatusCheckIntervalMs` | `60000` | Cada cuánto se comprueba el estado de los reportantes |
+| `Config.VoiceChannelBase` | `8000` | Las llamadas usan un canal aleatorio entre este valor y +1999 |
 
-## Configuración rápida
+## Compatibilidad con frameworks
 
-Todo lo esencial está en **`config.lua`**.
+| | QBCore | Qbox | ESX Legacy | Standalone / ox_core |
+|---|---|---|---|---|
+| Identificador guardado en la columna `citizenid` | `citizenid` | `citizenid` | `xPlayer.identifier` | `license:...` |
+| Nombre del personaje (panel de staff) | `charinfo` | `charinfo` | `xPlayer.getName()` | Nombre de FiveM |
+| Staff | `QBCore.Functions.HasPermission(src, Config.AdminGroups)` | ACE `group.<grupo>` o `exports.qbx_core:HasPermission` | `getGroup()` o nombre del job en `Config.AdminGroups` | ACE `Config.StandaloneAce` o `Config.StandaloneAdminLicenses` |
+| Notificaciones | `QBCore:Notify` | `exports.qbx_core:Notify` | `esx:showNotification` | Notificación nativa de GTA |
+| Comandos | `QBCore.Commands` | `RegisterCommand` | `RegisterCommand` | `RegisterCommand` |
 
-### Framework (`Config.Framework`)
-
-Un solo valor define el modo de ejecución y el recurso de export:
-
-| Valor | Recurso usado |
-|-------|----------------|
-| `qb` | `qb-core` |
-| `qbox` o `qbx` | `qbx_core` |
-| `esx` | `es_extended` |
-| `standalone` | Sin framework (identidad por `license`) |
-
-Ejemplo Qbox:
-
-```lua
-Config.Framework = 'qbox'
-```
-
-Ejemplo ESX:
-
-```lua
-Config.Framework = 'esx'
-```
-
-### Idioma
-
-```lua
-Config.Locale = 'es'   -- o 'en'
-```
-
-### Comandos (por defecto)
-
-| Comando | Quién | Descripción |
-|---------|--------|-------------|
-| `/report` | Jugadores | Crear reporte o abrir el chat si ya hay uno activo |
-| `/reportes` | Staff | Panel de administración |
-
-Los nombres se cambian con `Config.CommandPlayer` y `Config.CommandAdmin`.
-
-### Permisos de staff
-
-- **QB / Qbox:** `Config.AdminGroups` debe coincidir con los grupos ACE / permisos de QBCore (`HasPermission`).
-- **ESX:** se comprueba `getGroup()` y el **nombre del job** frente a la misma lista.
-- **Standalone:** usa `Config.StandaloneAce` (ACE) y/o `Config.StandaloneAdminLicenses` (lista de `license:...`).
-
-Ejemplo ACE para standalone:
+Ejemplo de ACE para staff en standalone:
 
 ```cfg
 add_ace group.admin jgr_reports.admin allow
 ```
 
-### Otros ajustes
+> La columna se sigue llamando `citizenid` en todos los frameworks; en ESX guarda el `identifier` y en standalone la licencia. Si cambias de framework, los reportes antiguos quedarán asociados al identificador anterior.
 
-- `Config.AutoCloseOfflineMinutes` — minutos desconectado antes del cierre automático.
-- `Config.StatusCheckIntervalMs` — intervalo del comprobador de inactividad / `serverId`.
-- `Config.VoiceChannelBase` — referencia interna de voz (llamadas con pma-voice).
+## Comandos
 
----
+| Comando | Quién | Descripción |
+|---|---|---|
+| `/report` | Jugadores | Crear reporte o abrir el chat del activo |
+| `/reportes` | Staff | Panel de reportes |
 
-## Estructura del proyecto
+## Actualizaciones
+
+Al arrancar, el servidor comprueba si hay una versión nueva (lista central de versiones de JGR) y lo avisa en la consola con tu versión, la última y el enlace de descarga. Para desactivar el aviso, añade al `server.cfg`:
+
+```cfg
+set jgr_versioncheck 0
+```
+
+## Solución de problemas
+
+- **En consola sale `Framework: standalone` y usas un framework**: inicia el framework **antes** que `JGR_Reports` o fíjalo con `Config.Framework`.
+- **El staff no puede abrir `/reportes`**: revisa `Config.AdminGroups` (QB/ESX), los ACE `group.<grupo>` (Qbox) o `Config.StandaloneAce` / licencias (standalone).
+- **No hay voz en las llamadas**: instala y arranca `pma-voice`.
+
+## Changelog
+
+### 1.1.0
+- Compatibilidad con **QBCore, Qbox, ESX Legacy y standalone/ox_core** con detección automática (`Config.Framework = 'auto'`).
+- **Corregido**: en Qbox se usaba `exports['qbx_core']:GetCoreObject()`, que no existe: no se cargaba ningún jugador y el script no funcionaba. Ahora usa `exports.qbx_core:GetPlayer`, `GetPlayerByCitizenId`, `Notify` y permisos ACE.
+- **Seguridad**: cualquier jugador podía enviar mensajes marcados como `[Staff]` y escribir en reportes ajenos. Ahora el servidor decide si el mensaje es de staff y solo deja escribir en el propio reporte activo.
+- **Seguridad**: contestar, rechazar y colgar llamadas se valida en el servidor (antes se podía meter a cualquier jugador en un canal de voz o colgar llamadas ajenas).
+- **Seguridad**: los nombres de jugador en el chat se escapan en la NUI (un nombre con HTML se ejecutaba en el panel del staff).
+- **Corregido**: tomar un reporte ya cerrado lo volvía a poner `En progreso`.
+- **Corregido**: el límite de un reporte activo por jugador solo lo aplicaba el comando; ahora también el servidor (más 30 s entre reportes).
+- La prioridad se valida (`Baja`, `Media`, `Alta`).
+- Al desconectarse un participante, la llamada se corta para el otro.
+- `Config.VoiceChannelBase` ahora se usa de verdad para elegir el canal.
+- Comprobador de versiones común de JGR (`server/version_check.lua`), desactivable con `set jgr_versioncheck 0`.
+
+### 1.0.0
+- Versión inicial.
+
+## Estructura
 
 ```
 JGR_Reports/
 ├── bridge/
-│   ├── cl_bridge.lua      # Cliente: framework + callbacks
-│   └── sv_bridge.lua      # Servidor: framework + comandos + callbacks
-├── client/
-│   └── client.lua
+│   ├── sh_bridge.lua      # Detección de framework (compartido)
+│   ├── cl_bridge.lua      # Cliente: notificaciones + callbacks
+│   └── sv_bridge.lua      # Servidor: jugadores, staff, comandos, callbacks
+├── client/client.lua
 ├── server/
-│   └── server.lua
-├── locales/
-│   ├── en.lua
-│   └── es.lua
-├── html/                  # NUI (HTML / CSS / JS)
+│   ├── init.lua           # Comprobación del nombre del recurso
+│   ├── server.lua
+│   └── version_check.lua  # Comprobador de versiones común JGR
+├── locales/ (es, en)
+├── html/                  # NUI
 ├── config.lua
 ├── locale_shared.lua
-├── install.sql
-├── fxmanifest.lua
-└── README.md
+└── install.sql
 ```
 
----
+## Soporte y créditos
 
-## Base de datos
+Desarrollado por **JGR** · GitHub: [jgr-ry](https://github.com/jgr-ry).
 
-- Tablas: `jgr_reports`, `jgr_report_messages`.
-- La columna **`citizenid`** almacena el identificador unificado del jugador (citizenid en QB, `identifier` en ESX, `license:` en standalone).
-
----
-
-## Solución de problemas
-
-- **No cargan los callbacks / errores de framework:** revisa que `Config.Framework` coincida con el recurso real (`qb-core`, `qbx_core`, `es_extended`) y el orden de `ensure` en `server.cfg`.
-- **Staff no puede abrir `/reportes`:** revisa `AdminGroups` (QB) o grupo/job (ESX) o ACE/licencias (standalone).
-- **Sin llamadas de voz:** instala y arranca **pma-voice**; si no está, el script no debería fallar (usa `pcall`).
-- **Textos mezclados:** confirma `Config.Locale` y que existan las claves en `locales/*.lua`.
-
----
-
-## Créditos
-
-- **JGR Studio** — desarrollo y diseño del recurso.
-- Comunidad **FiveM** y autores de **oxmysql**, frameworks y **pma-voice**.
-
----
-
-## Licencia
-
-Uso y redistribución según las condiciones que defina **JGR Studio**. Si publicas en GitHub, añade un archivo `LICENSE` acorde a tu política.
-
----
-
-¿Dudas o mejoras? Abre un **issue** o un **pull request** en el repositorio.
+Para dudas o errores abre un *issue* en [github.com/jgr-ry/JGR_Reports](https://github.com/jgr-ry/JGR_Reports).
